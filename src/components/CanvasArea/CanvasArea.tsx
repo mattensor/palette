@@ -1,17 +1,21 @@
-import type { RefObject } from "react"
+import { forwardRef } from "react"
+import type { CanvasHTMLAttributes } from "react"
 import styles from "./styles.module.css"
 
-interface Props {
-  canvasRef: RefObject<HTMLCanvasElement | null>
-}
+type Props = CanvasHTMLAttributes<HTMLCanvasElement>
 
-export function CanvasArea({ canvasRef }: Props) {
-  return (
-    <canvas
-      ref={canvasRef}
-      className={styles.canvas}
-    >
-      Interactive design editor for creating graphics
-    </canvas>
-  )
-}
+export const CanvasArea = forwardRef<HTMLCanvasElement, Props>(
+  ({ className, ...props }, ref) => {
+    return (
+      <canvas
+        ref={ref}
+        className={`${styles.canvas} ${className ?? ""}`}
+        {...props}
+      >
+        Interactive design editor for creating graphics
+      </canvas>
+    )
+  }
+)
+
+CanvasArea.displayName = "CanvasArea";

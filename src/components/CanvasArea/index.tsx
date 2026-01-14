@@ -1,1 +1,1 @@
-export * from "./CanvasArea"
+export { CanvasArea } from "./CanvasArea"

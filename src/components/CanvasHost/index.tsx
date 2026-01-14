@@ -1,1 +1,1 @@
-export * from "./CanvasHost"
+export { CanvasHost } from "./CanvasHost"
