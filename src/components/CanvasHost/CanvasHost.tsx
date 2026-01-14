@@ -1,47 +1,38 @@
-import { useRef } from "react"
 import type { PointerEvent } from "react"
+import { useRef } from "react"
 import { CanvasArea } from "../CanvasArea"
-import styles from './styles.module.css'
+import styles from "./styles.module.css"
 
 export function CanvasHost() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-    
-  function onPointerDown(event: PointerEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current
-    if (canvas == null) return
+	const canvasRef = useRef<HTMLCanvasElement>(null)
 
-    const context = canvas.getContext('2d')
-    if (context == null) return
+	function onPointerDown(event: PointerEvent<HTMLCanvasElement>) {
+		const canvas = canvasRef.current
+		if (canvas == null) return
 
-    // canvas bounds in viewport coordinates
-    const canvasPosition = canvas.getBoundingClientRect()
+		const context = canvas.getContext("2d")
+		if (context == null) return
 
-    // pointer position in viewport coordinates
-    const xClickPosition = event.clientX
-    const yClickPosition = event.clientY
+		// canvas bounds in viewport coordinates
+		const canvasPosition = canvas.getBoundingClientRect()
 
-    // convert viewport → canvas coordinates
-    const canvasXClickPosition = xClickPosition - canvasPosition.left
-    const canvasYClickPosition = yClickPosition - canvasPosition.top
+		// pointer position in viewport coordinates
+		const xClickPosition = event.clientX
+		const yClickPosition = event.clientY
 
-    // draw a dot at the pointer location
-    context.beginPath()
-    context.arc(
-      canvasXClickPosition,
-      canvasYClickPosition,
-      4,
-      0,
-      Math.PI * 2
-    )
-    context.fill()
-  }
+		// convert viewport → canvas coordinates
+		const canvasXClickPosition = xClickPosition - canvasPosition.left
+		const canvasYClickPosition = yClickPosition - canvasPosition.top
 
-  return (
-    <div className={styles.canvasHost}>
-      <CanvasArea 
-        ref={canvasRef}
-        onPointerDown={onPointerDown}
-      />
-    </div>
-  )
+		// draw a dot at the pointer location
+		context.beginPath()
+		context.arc(canvasXClickPosition, canvasYClickPosition, 4, 0, Math.PI * 2)
+		context.fill()
+	}
+
+	return (
+		<div className={styles.canvasHost}>
+			<CanvasArea ref={canvasRef} onPointerDown={onPointerDown} />
+		</div>
+	)
 }
