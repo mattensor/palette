@@ -14,19 +14,27 @@ export function CanvasHost() {
 		if (context == null) return
 
 		// canvas bounds in viewport coordinates
-		const canvasPosition = canvas.getBoundingClientRect()
+		const canvasRectangle = canvas.getBoundingClientRect()
+
+		// ensure css pixles match device pixels
+		const devicePixelRatio = window.devicePixelRatio || 1
+		canvas.width = Math.floor(canvasRectangle.width * devicePixelRatio)
+		canvas.height = Math.floor(canvasRectangle.height * devicePixelRatio)
+
+		// ensure drawing is scaled
+		context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
 
 		// pointer position in viewport coordinates
 		const xClickPosition = event.clientX
 		const yClickPosition = event.clientY
 
 		// convert viewport → canvas coordinates
-		const canvasXClickPosition = xClickPosition - canvasPosition.left
-		const canvasYClickPosition = yClickPosition - canvasPosition.top
+		const canvasXClickPosition = xClickPosition - canvasRectangle.left
+		const canvasYClickPosition = yClickPosition - canvasRectangle.top
 
 		// draw a dot at the pointer location
 		context.beginPath()
-		context.arc(canvasXClickPosition, canvasYClickPosition, 4, 0, Math.PI * 2)
+		context.arc(canvasXClickPosition, canvasYClickPosition, 30, 0, Math.PI * 2)
 		context.fill()
 	}
 
