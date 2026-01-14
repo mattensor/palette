@@ -1,9 +1,14 @@
 import './App.css'
-import { Canvas } from './components/Canvas'
+import { Editor } from './components/Editor'
+import { Sidebar } from './components/Sidebar'
+import styles from './styles.module.css'
 
 function App() {
   return (
-    <Canvas />
+    <div className={styles.app}>
+      <Sidebar />
+      <Editor />
+    </div>
   )
 }
 
