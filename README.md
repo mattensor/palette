@@ -1,73 +1,142 @@
-# React + TypeScript + Vite
+# Palette
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Palette is a canvas-based editor I’m building to practice **frontend system design**, not UI polish.
 
-Currently, two official plugins are available:
+The focus of this project is on:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- input handling
+- state modeling
+- rendering boundaries
+- performance constraints
 
-## React Compiler
+I’m deliberately treating this like an internal editor system rather than a demo app.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## What this project is (and isn’t)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+This project is about **how an editor works**, not how it looks.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+I’m using it to explore:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- pointer input normalization
+- deterministic state updates
+- frame-aware rendering
+- clear separation between DOM, logic, and rendering
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+It is **not**:
+
+- a finished product
+- a UI-heavy design exercise
+- a collection of React patterns
+
+---
+
+## Architecture overview
+
+The editor is split into a few clear layers:
+
+```
+[ App / Layout ]
+  AppShell, Sidebar, Editor
+
+[ DOM Adapter ]
+  CanvasHost
+
+[ Editor Core (headless) ]
+  EditorState, Reducer, Renderer
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Key ideas:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- The editor core does not depend on React or the DOM
+- CanvasHost adapts browser input and scheduling to the editor
+- Rendering is a pure read of editor state
+- Layout decisions don’t leak into editor logic
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## Component hierarchy
+
 ```
+Root (#root)
+└── App
+    └── AppShell
+        ├── Sidebar
+        └── Editor
+            └── CanvasHost
+                └── CanvasSurface
+```
+
+Each component has a single responsibility and minimal knowledge of the others.
+
+---
+
+## Current scope
+
+Right now, the editor supports:
+
+- pointer-driven drawing
+- normalized pointer events
+- a single source of truth for editor state
+- rendering batched with \`requestAnimationFrame\`
+- a stable, full-viewport canvas layout
+
+Things that are intentionally **not** implemented yet:
+
+- selection
+- undo / redo
+- zoom / pan
+- persistence
+- performance optimizations
+- tooling UI
+
+Those will be added later, once the foundations are solid.
+
+---
+
+## Tech stack
+
+- React
+- TypeScript
+- Vite
+- Canvas 2D
+
+No state libraries.  
+No rendering frameworks.  
+No styling systems.
+
+---
+
+## Running locally
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## How I’m approaching this
+
+A few rules I’m following while building this:
+
+- Build the simplest thing that’s correct
+- Keep boundaries explicit
+- Prefer boring code over clever code
+- Don’t optimize until there’s something to optimize
+- Treat architecture decisions as part of the output
+
+This repo is meant to show **how I think about frontend systems**, not just what I can ship quickly.
+
+---
+
+## Status
+
+This project is actively in progress and intentionally incomplete.
+
+Each phase focuses on one concern at a time:
+
+- correctness first
+- structure second
+- polish last
