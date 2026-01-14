@@ -1,6 +1,6 @@
 import "./App.css"
-import { Editor } from "./components/Editor"
-import { Sidebar } from "./components/Sidebar"
+import { Editor } from "@/components/Editor"
+import { Sidebar } from "@/components/Sidebar"
 import styles from "./styles.module.css"
 
 function App() {

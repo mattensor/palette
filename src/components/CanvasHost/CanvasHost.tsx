@@ -1,6 +1,6 @@
 import type { PointerEvent } from "react"
 import { useRef } from "react"
-import { CanvasArea } from "../CanvasArea"
+import { CanvasArea } from "@/components/CanvasArea"
 import styles from "./styles.module.css"
 
 export function CanvasHost() {

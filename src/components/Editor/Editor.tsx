@@ -1,4 +1,4 @@
-import { CanvasHost } from "../CanvasHost"
+import { CanvasHost } from "@/components/CanvasHost"
 
 export function Editor() {
 	return <CanvasHost />
