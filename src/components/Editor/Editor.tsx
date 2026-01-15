@@ -1,5 +1,5 @@
-import { CanvasHost } from "@/components/CanvasHost"
+import { EditorCanvas } from "@/components/EditorCanvas"
 
 export function Editor() {
-	return <CanvasHost />
+	return <EditorCanvas />
 }

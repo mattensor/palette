@@ -1,9 +1,10 @@
 import type { PointerEvent } from "react"
 import { useEffect, useRef } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
+import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import styles from "./styles.module.css"
 
-export function CanvasHost() {
+export function EditorCanvas() {
 	const hostRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -18,15 +19,12 @@ export function CanvasHost() {
 			const context = canvas.getContext("2d")
 			if (context == null) return
 
-			// canvas bounds in viewport coordinates
 			const canvasRectangle = canvas.getBoundingClientRect()
 
-			// ensure css pixles match device pixels
 			const devicePixelRatio = window.devicePixelRatio || 1
 			canvas.width = Math.floor(canvasRectangle.width * devicePixelRatio)
 			canvas.height = Math.floor(canvasRectangle.height * devicePixelRatio)
 
-			// ensure drawing is scaled
 			context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
 		}
 
@@ -46,26 +44,28 @@ export function CanvasHost() {
 		const context = canvas.getContext("2d")
 		if (context == null) return
 
-		// canvas bounds in viewport coordinates
-		const canvasRectangle = canvas.getBoundingClientRect()
-
-		// pointer position in viewport coordinates
-		const xClickPosition = event.clientX
-		const yClickPosition = event.clientY
-
-		// convert viewport → canvas coordinates
-		const canvasXClickPosition = xClickPosition - canvasRectangle.left
-		const canvasYClickPosition = yClickPosition - canvasRectangle.top
+		const inputEvent = normalisePointerEvent(event, canvas)
 
 		// draw a dot at the pointer location
 		context.beginPath()
-		context.arc(canvasXClickPosition, canvasYClickPosition, 30, 0, Math.PI * 2)
+		context.arc(
+			inputEvent.position.x,
+			inputEvent.position.y,
+			30,
+			0,
+			Math.PI * 2,
+		)
 		context.fill()
 	}
 
 	return (
 		<div ref={hostRef} className={styles.canvasHost}>
-			<CanvasArea ref={canvasRef} onPointerDown={onPointerDown} />
+			<CanvasArea
+				ref={canvasRef}
+				onPointerDown={onPointerDown}
+				onPointerMove={onPointerDown}
+				onPointerUp={onPointerDown}
+			/>
 		</div>
 	)
 }
