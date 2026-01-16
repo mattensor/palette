@@ -42,6 +42,7 @@ function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
 	return {
 		...prev,
 		runtime: {
+			...prev.runtime,
 			pointer: {
 				...prev.runtime.pointer,
 				current: event.position,

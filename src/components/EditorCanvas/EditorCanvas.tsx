@@ -34,6 +34,7 @@ export function EditorCanvas() {
 			canvas.height = Math.floor(canvasRectangle.height * devicePixelRatio)
 
 			context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
+			render(canvas, editorStateRef.current)
 		}
 
 		const resizeObserver = new ResizeObserver(onResize)
