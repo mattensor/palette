@@ -17,6 +17,11 @@ export type EditorEvent =
 			pointerId: string
 			position: Point
 	  }
+	| {
+			type: "POINTER_CANCEL"
+			pointerId: string
+			position: Point
+	  }
 
 export type PointerPhase =
 	| { kind: "idle" }

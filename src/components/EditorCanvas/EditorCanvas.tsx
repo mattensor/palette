@@ -1,12 +1,16 @@
 import type { PointerEvent } from "react"
 import { useEffect, useRef } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
+import type { EditorEvent } from "@/components/EditorCanvas/types"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import styles from "./styles.module.css"
 
 export function EditorCanvas() {
 	const hostRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
+
+	const eventQueueRef = useRef<EditorEvent[]>([])
+	const frameScheduledRef = useRef(false)
 
 	useEffect(() => {
 		const host = hostRef.current
@@ -37,34 +41,78 @@ export function EditorCanvas() {
 		}
 	}, [])
 
-	function onPointerDown(event: PointerEvent<HTMLCanvasElement>) {
+	function draw() {}
+
+	// process the queue events in order
+	// update state via reducer
+	// then draw
+	function processFrame() {
+		const eventsToProcess = eventQueueRef.current
+		eventQueueRef.current = []
+
+		for (const _event of eventsToProcess) {
+			// console.log({ event: event.type })
+		}
+
+		draw()
+	}
+
+	function scheduleFrame() {
+		if (frameScheduledRef.current === true) return
+
+		frameScheduledRef.current = true
+
+		requestAnimationFrame(() => {
+			try {
+				processFrame()
+			} finally {
+				frameScheduledRef.current = false
+
+				if (eventQueueRef.current.length > 0) {
+					scheduleFrame()
+				}
+			}
+		})
+	}
+
+	function enqueueEvent(event: EditorEvent) {
+		eventQueueRef.current.push(event)
+		scheduleFrame()
+	}
+
+	function handlePointerEvent(event: PointerEvent<HTMLCanvasElement>) {
 		const canvas = canvasRef.current
 		if (canvas == null) return
 
-		const context = canvas.getContext("2d")
-		if (context == null) return
+		const editorEvent = normalisePointerEvent(event, canvas)
+		enqueueEvent(editorEvent)
+	}
 
-		const inputEvent = normalisePointerEvent(event, canvas)
+	function handlePointerDown(e: PointerEvent<HTMLCanvasElement>) {
+		e.currentTarget.setPointerCapture(e.pointerId)
+		handlePointerEvent(e)
+	}
 
-		// draw a dot at the pointer location
-		context.beginPath()
-		context.arc(
-			inputEvent.position.x,
-			inputEvent.position.y,
-			30,
-			0,
-			Math.PI * 2,
-		)
-		context.fill()
+	function handlePointerUp(e: PointerEvent<HTMLCanvasElement>) {
+		handlePointerEvent(e)
+		e.currentTarget.releasePointerCapture(e.pointerId)
+	}
+
+	function handlePointerCancel(e: PointerEvent<HTMLCanvasElement>) {
+		handlePointerEvent(e)
+		try {
+			e.currentTarget.releasePointerCapture(e.pointerId)
+		} catch {}
 	}
 
 	return (
 		<div ref={hostRef} className={styles.canvasHost}>
 			<CanvasArea
 				ref={canvasRef}
-				onPointerDown={onPointerDown}
-				onPointerMove={onPointerDown}
-				onPointerUp={onPointerDown}
+				onPointerDown={handlePointerDown}
+				onPointerMove={handlePointerEvent}
+				onPointerUp={handlePointerUp}
+				onPointerCancel={handlePointerCancel}
 			/>
 		</div>
 	)

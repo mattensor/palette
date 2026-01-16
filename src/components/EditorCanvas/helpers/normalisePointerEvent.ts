@@ -6,6 +6,7 @@ const POINTER_TYPE_TO_EDITOR_EVENT_TYPE = {
 	pointermove: "POINTER_MOVE",
 	pointerdown: "POINTER_DOWN",
 	pointerup: "POINTER_UP",
+	pointercancel: "POINTER_CANCEL",
 } as const
 
 type PointerDomType = keyof typeof POINTER_TYPE_TO_EDITOR_EVENT_TYPE
