@@ -23,13 +23,17 @@ export type EditorEvent =
 			position: Point
 	  }
 
+export type EditorEventType = EditorEvent["type"]
+
 export type PointerPhase =
 	| { kind: "idle" }
 	| { kind: "dragging"; id: string; origin: Point; current: Point }
 
-export type Rect = { id: string; origin: Point; size: Size }
+export type ShapeId = string
+
+export type Rect = { id: ShapeId; origin: Point; size: Size }
 
 export type EditorState = {
-	doc: { shapes: ReadonlyMap<string, Rect> }
+	doc: { shapes: ReadonlyMap<ShapeId, Rect> }
 	runtime: { pointer: PointerPhase }
 }

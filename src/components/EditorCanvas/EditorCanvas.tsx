@@ -1,6 +1,10 @@
 import type { PointerEvent } from "react"
 import { useEffect, useRef } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
+import {
+	createInitialState,
+	editorReducer,
+} from "@/components/EditorCanvas/editorReducer"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import styles from "./styles.module.css"
@@ -11,6 +15,8 @@ export function EditorCanvas() {
 
 	const eventQueueRef = useRef<EditorEvent[]>([])
 	const frameScheduledRef = useRef(false)
+
+	const editorStateRef = useRef(createInitialState())
 
 	useEffect(() => {
 		const host = hostRef.current
@@ -50,8 +56,13 @@ export function EditorCanvas() {
 		const eventsToProcess = eventQueueRef.current
 		eventQueueRef.current = []
 
-		for (const _event of eventsToProcess) {
-			// console.log({ event: event.type })
+		for (const event of eventsToProcess) {
+			const prev = editorStateRef.current
+			editorStateRef.current = editorReducer(prev, event)
+		}
+
+		if (editorStateRef.current.runtime.pointer.kind === "dragging") {
+			console.log({ cs: editorStateRef.current })
 		}
 
 		draw()
