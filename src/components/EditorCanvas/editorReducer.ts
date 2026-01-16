@@ -66,7 +66,7 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
 		},
 	}
 
-	const shapes = new Map([...prev.doc.shapes])
+	const shapes = new Map(prev.doc.shapes)
 	shapes.set(rect.id, rect)
 
 	return {

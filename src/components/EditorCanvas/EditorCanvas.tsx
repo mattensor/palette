@@ -1,13 +1,11 @@
 import type { PointerEvent } from "react"
 import { useEffect, useRef } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
-import {
-	createInitialState,
-	editorReducer,
-} from "@/components/EditorCanvas/editorReducer"
-import type { EditorEvent } from "@/components/EditorCanvas/types"
+import { createInitialState, editorReducer } from "./editorReducer"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
+import { render } from "./render"
 import styles from "./styles.module.css"
+import type { EditorEvent } from ".//types"
 
 export function EditorCanvas() {
 	const hostRef = useRef<HTMLDivElement>(null)
@@ -47,11 +45,6 @@ export function EditorCanvas() {
 		}
 	}, [])
 
-	function draw() {}
-
-	// process the queue events in order
-	// update state via reducer
-	// then draw
 	function processFrame() {
 		const eventsToProcess = eventQueueRef.current
 		eventQueueRef.current = []
@@ -61,11 +54,9 @@ export function EditorCanvas() {
 			editorStateRef.current = editorReducer(prev, event)
 		}
 
-		if (editorStateRef.current.runtime.pointer.kind === "dragging") {
-			console.log({ cs: editorStateRef.current })
+		if (canvasRef.current) {
+			render(canvasRef.current, editorStateRef.current)
 		}
-
-		draw()
 	}
 
 	function scheduleFrame() {
