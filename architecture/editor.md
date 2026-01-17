@@ -50,3 +50,6 @@ If rendering occurred immediately for every event, this would result in:
 The browser typically renders at around 60 frames per second.  
 By batching editor events and processing them once per animation frame, we work with the browser and produce smoother interactions.
 
+## Pointer Phase
+
+## Runtime vs Document
