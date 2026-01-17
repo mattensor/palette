@@ -1,3 +1,4 @@
+import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
 import type { EditorState, Rect } from "./types"
 
 function drawRect(context: CanvasRenderingContext2D, rect: Rect) {
@@ -13,13 +14,19 @@ function drawPreviewRect(
 	const phase = runtime.pointer
 	if (phase.kind !== "dragging") return
 
+	const tempRect = normaliseRect(
+		phase.origin,
+		phase.current,
+		crypto.randomUUID(),
+	)
+
 	context.save()
 	context.setLineDash([6, 4])
 	context.strokeRect(
-		phase.origin.x,
-		phase.origin.y,
-		phase.current.x - phase.origin.x,
-		phase.current.y - phase.origin.y,
+		tempRect.origin.x,
+		tempRect.origin.y,
+		tempRect.size.width,
+		tempRect.size.height,
 	)
 	context.restore()
 }

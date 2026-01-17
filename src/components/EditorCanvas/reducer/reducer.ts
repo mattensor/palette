@@ -1,3 +1,4 @@
+import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
 import type {
 	EditorEvent,
 	EditorEventType,
@@ -58,14 +59,7 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
 	const origin = prev.runtime.pointer.origin
 	const current = event.position
 
-	const rect = {
-		id: crypto.randomUUID(),
-		origin,
-		size: {
-			width: current.x - origin.x,
-			height: current.y - origin.y,
-		},
-	}
+	const rect = normaliseRect(origin, current, crypto.randomUUID())
 
 	const shapes = new Map(prev.doc.shapes)
 	shapes.set(rect.id, rect)
@@ -84,6 +78,7 @@ function POINTER_CANCEL(prev: EditorState, _event: EditorEvent): EditorState {
 	return {
 		...prev,
 		runtime: {
+			...prev.runtime,
 			pointer: { kind: "idle" },
 		},
 	}
@@ -96,10 +91,7 @@ const handlers: Record<EditorEventType, EditorReducerHandler> = {
 	POINTER_CANCEL,
 }
 
-export function editorReducer(
-	prev: EditorState,
-	event: EditorEvent,
-): EditorState {
+export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 	const handler = handlers[event.type]
 
 	return handler ? handler(prev, event) : prev

@@ -1,8 +1,8 @@
 import type { PointerEvent } from "react"
 import { useEffect, useRef } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
-import { createInitialState, editorReducer } from "./editorReducer"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
+import { createInitialState, reducer } from "./reducer"
 import { render } from "./render"
 import styles from "./styles.module.css"
 import type { EditorEvent } from ".//types"
@@ -52,7 +52,7 @@ export function EditorCanvas() {
 
 		for (const event of eventsToProcess) {
 			const prev = editorStateRef.current
-			editorStateRef.current = editorReducer(prev, event)
+			editorStateRef.current = reducer(prev, event)
 		}
 
 		if (canvasRef.current) {
