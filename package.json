@@ -11,7 +11,9 @@
 		"typecheck": "tsc -b",
 		"check": "bun run typecheck && bunx biome check .",
 		"fix": "bunx biome check . --write",
-		"clean": "rm -rf dist node_modules/.vite"
+		"clean": "rm -rf dist node_modules/.vite",
+		"test": "vitest --config=vitest.config.ts",
+		"test:browser": "vitest --config=vitest.browser.config.ts"
 	},
 	"dependencies": {
 		"react": "^19.2.0",
@@ -23,7 +25,10 @@
 		"@types/react": "^19.2.5",
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^5.1.1",
-		"vite": "^7.2.4"
+		"@vitest/browser-playwright": "^4.0.17",
+		"vite": "^7.2.4",
+		"vitest": "^4.0.17",
+		"vitest-browser-react": "^2.0.2"
 	},
 	"engines": {
 		"bun": ">=1.1.0"
