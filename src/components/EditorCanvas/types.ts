@@ -29,7 +29,7 @@ export type EditorEvent =
 export type EditorEventType = EditorEvent["type"]
 
 export type Metrics = {
-	lastFrameMs: number | null
+	lastRenderMs: number | null
 	shapeCount: number
 }
 

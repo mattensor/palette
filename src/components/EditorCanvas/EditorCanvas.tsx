@@ -1,6 +1,7 @@
 import type { PointerEvent } from "react"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
+import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import { createInitialState, reducer } from "./reducer"
 import { render } from "./render"
@@ -15,6 +16,24 @@ export function EditorCanvas() {
 	const frameScheduledRef = useRef(false)
 
 	const editorStateRef = useRef(createInitialState())
+
+	const [debugSnapshot, setDebugSnapshot] = useState<DebugSnapshot>(() => ({
+		mode: editorStateRef.current.session.mode,
+		debug: editorStateRef.current.debug,
+	}))
+
+	useEffect(() => {
+		const id = window.setInterval(() => {
+			const s = editorStateRef.current
+			// Shallow snapshot is enough since you're replacing state in the reducer.
+			setDebugSnapshot({
+				mode: s.session.mode,
+				debug: s.debug,
+			})
+		}, 100) // 10 fps
+
+		return () => window.clearInterval(id)
+	}, [])
 
 	useEffect(() => {
 		const host = hostRef.current
@@ -55,9 +74,15 @@ export function EditorCanvas() {
 			editorStateRef.current = reducer(prev, event)
 		}
 
-		if (canvasRef.current) {
-			render(canvasRef.current, editorStateRef.current)
-		}
+		const canvas = canvasRef.current
+		if (canvas == null) return
+
+		const before = performance.now()
+		render(canvas, editorStateRef.current)
+		const after = performance.now()
+
+		// mutate in place to avoid updating editor state every frame
+		editorStateRef.current.debug.metrics.lastRenderMs = after - before
 	}
 
 	function scheduleFrame() {
@@ -117,6 +142,7 @@ export function EditorCanvas() {
 				onPointerUp={handlePointerUp}
 				onPointerCancel={handlePointerCancel}
 			/>
+			<DevPanel snapshot={debugSnapshot} />
 		</div>
 	)
 }

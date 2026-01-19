@@ -1,0 +1,64 @@
+.panel {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 320px;
+
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+	line-height: 1.35;
+
+	background: rgba(0, 0, 0, 0.75);
+	color: white;
+
+	padding: 10px;
+	border-radius: 8px;
+
+	pointer-events: auto;
+}
+
+.title {
+	font-weight: 700;
+	margin-bottom: 8px;
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: 120px 1fr;
+	gap: 6px;
+}
+
+.sectionTitle {
+	margin-top: 10px;
+	font-weight: 700;
+}
+
+.logList {
+	margin-top: 6px;
+	max-height: 180px;
+	overflow: auto;
+}
+
+.empty {
+	opacity: 0.7;
+}
+
+.logItem {
+	margin-bottom: 6px;
+}
+
+.logMeta {
+	/* container for ts + delta */
+}
+
+.logTs {
+	opacity: 0.7;
+}
+
+.logDelta {
+	opacity: 0.6;
+}
+
+.logName {
+	font-weight: 600;
+}
