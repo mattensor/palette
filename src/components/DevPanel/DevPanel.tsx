@@ -6,15 +6,42 @@ export type DebugSnapshot = {
 	debug: DebugState
 }
 
+const LOGS_TO_SHOW = 12
+
 function formatMs(ms: number | null) {
-	if (ms == null) return "—"
-	return `${ms.toFixed(2)} ms`
+	return ms == null ? "—" : `${ms.toFixed(2)} ms`
+}
+
+function getLastN<T>(items: readonly T[], n: number): readonly T[] {
+	return items.slice(Math.max(0, items.length - n))
+}
+
+type LogRow = {
+	key: string
+	tsText: string
+	deltaText: string | null
+	name: string
+}
+
+function toLogRows(devLog: readonly { ts: number; name: string }[]): LogRow[] {
+	return devLog.map((e, idx) => {
+		const prev = idx > 0 ? devLog[idx - 1] : null
+		const delta = prev ? e.ts - prev.ts : null
+
+		return {
+			key: `${e.ts}-${idx}`,
+			tsText: e.ts.toFixed(1),
+			deltaText: delta == null ? null : `(+${delta.toFixed(1)}ms)`,
+			name: e.name,
+		}
+	})
 }
 
 export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 	const { mode, debug } = snapshot
-	const logs = debug.devLog
-	const lastLogs = logs.slice(Math.max(0, logs.length - 12))
+	const { metrics, devLog } = debug
+
+	const recentLogRows = toLogRows(getLastN(devLog, LOGS_TO_SHOW))
 
 	return (
 		<div className={styles.panel}>
@@ -25,36 +52,29 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 				<div>{mode.kind}</div>
 
 				<div>shapeCount</div>
-				<div>{debug.metrics.shapeCount}</div>
+				<div>{metrics.shapeCount}</div>
 
 				<div>lastRenderMs</div>
-				<div>{formatMs(debug.metrics.lastRenderMs)}</div>
+				<div>{formatMs(metrics.lastRenderMs)}</div>
 			</div>
 
 			<div className={styles.sectionTitle}>devLog</div>
 
 			<div className={styles.logList}>
-				{lastLogs.length === 0 ? (
+				{recentLogRows.length === 0 ? (
 					<div className={styles.empty}>—</div>
 				) : (
-					lastLogs.map((e, idx) => {
-						const prev = idx > 0 ? lastLogs[idx - 1] : null
-						const delta = prev ? e.ts - prev.ts : null
-
-						return (
-							<div key={`${e.ts}-${idx}`} className={styles.logItem}>
-								<div className={styles.logMeta}>
-									<span className={styles.logTs}>{e.ts.toFixed(1)}</span>{" "}
-									{delta != null && (
-										<span className={styles.logDelta}>
-											(+{delta.toFixed(1)}ms)
-										</span>
-									)}
-								</div>
-								<div className={styles.logName}>{e.name}</div>
+					recentLogRows.map((row) => (
+						<div key={row.key} className={styles.logItem}>
+							<div className={styles.logMeta}>
+								<span className={styles.logTs}>{row.tsText}</span>{" "}
+								{row.deltaText != null && (
+									<span className={styles.logDelta}>{row.deltaText}</span>
+								)}
 							</div>
-						)
-					})
+							<div className={styles.logName}>{row.name}</div>
+						</div>
+					))
 				)}
 			</div>
 		</div>
