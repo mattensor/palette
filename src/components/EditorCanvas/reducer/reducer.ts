@@ -40,9 +40,12 @@ export function createInitialState(): EditorState {
 	return {
 		doc: {
 			shapes: new Map(),
+			shapeOrder: [],
 		},
 		session: {
 			mode: { kind: "idle" },
+			selection: { kind: "none" },
+			hover: { kind: "none" },
 		},
 		debug: {
 			metrics: {
@@ -62,8 +65,8 @@ function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
 		session: {
 			...prev.session,
 			mode: {
-				kind: "dragging",
-				id: event.pointerId,
+				kind: "drawingRect",
+				pointerId: event.pointerId,
 				origin: event.position,
 				current: event.position,
 			},
@@ -74,14 +77,14 @@ function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
 		pointerId: event.pointerId,
 		pos: event.position,
 	})
-	next = log(next, "mode/change", { from: "idle", to: "dragging" })
+	next = log(next, "mode/change", { from: "idle", to: "drawingRect" })
 
 	return next
 }
 
 function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.session.mode.kind !== "dragging") return prev
-	if (prev.session.mode.id !== event.pointerId) return prev
+	if (prev.session.mode.kind !== "drawingRect") return prev
+	if (prev.session.mode.pointerId !== event.pointerId) return prev
 
 	// No logging here (too noisy)
 	return {
@@ -97,13 +100,14 @@ function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
 }
 
 function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.session.mode.kind !== "dragging") return prev
-	if (prev.session.mode.id !== event.pointerId) return prev
+	if (prev.session.mode.kind !== "drawingRect") return prev
+	if (prev.session.mode.pointerId !== event.pointerId) return prev
 
 	const origin = prev.session.mode.origin
 	const current = event.position
 
-	const rect = normaliseRect(origin, current, createShapeId())
+	const newShapeId = createShapeId()
+	const rect = normaliseRect(origin, current, newShapeId)
 
 	const shapes = new Map(prev.doc.shapes)
 	shapes.set(rect.id, rect)
@@ -113,6 +117,7 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
 		doc: {
 			...prev.doc,
 			shapes,
+			shapeOrder: [...prev.doc.shapeOrder, newShapeId],
 		},
 		session: {
 			...prev.session,
@@ -138,7 +143,7 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
 		width: rect.width,
 		height: rect.height,
 	})
-	next = log(next, "mode/change", { from: "dragging", to: "idle" })
+	next = log(next, "mode/change", { from: "drawingRect", to: "idle" })
 
 	return next
 }

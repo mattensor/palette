@@ -47,14 +47,27 @@ export type DebugState = {
 export type Mode =
 	| { kind: "idle" }
 	| {
-			kind: "dragging"
-			id: PointerId
+			kind: "drawingRect"
+			pointerId: PointerId
 			origin: CanvasPoint
 			current: CanvasPoint
 	  }
+	| {
+			kind: "draggingSelection"
+			pointerId: PointerId
+			shapeId: ShapeId
+			startPointer: CanvasPoint
+			startRect: Rect
+	  }
+
+export type Selection = { kind: "none" } | { kind: "single"; id: ShapeId }
+
+export type Hover = { kind: "none" } | { kind: "shape"; id: ShapeId }
 
 export type SessionState = {
 	mode: Mode
+	selection: Selection
+	hover: Hover
 }
 
 export type Rect = {
@@ -67,6 +80,7 @@ export type Rect = {
 
 export type DocumentState = {
 	shapes: ReadonlyMap<ShapeId, Rect>
+	shapeOrder: readonly ShapeId[]
 }
 
 export type EditorState = {

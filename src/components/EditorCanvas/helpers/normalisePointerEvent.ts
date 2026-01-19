@@ -1,7 +1,5 @@
 import { createPointerId } from "@/components/EditorCanvas/helpers/createPointerId"
-import type { EditorEvent } from "../types"
-
-type CanvasPosition = { x: number; y: number }
+import type { CanvasPoint, EditorEvent } from "@/components/EditorCanvas/types"
 
 const POINTER_TYPE_TO_EDITOR_EVENT_TYPE = {
 	pointermove: "POINTER_MOVE",
@@ -20,7 +18,7 @@ export function normalisePointerEvent(
 		throw new Error(`Unsupported pointer event type: ${event.type}`)
 	}
 
-	const position = toCanvasPosition(event, canvas)
+	const position = toCanvasPoint(event, canvas)
 	const type = POINTER_TYPE_TO_EDITOR_EVENT_TYPE[event.type as PointerDomType]
 
 	return {
@@ -30,10 +28,10 @@ export function normalisePointerEvent(
 	}
 }
 
-export function toCanvasPosition(
+export function toCanvasPoint(
 	event: React.PointerEvent<HTMLCanvasElement>,
 	canvas: HTMLCanvasElement,
-): CanvasPosition {
+): CanvasPoint {
 	const rect = canvas.getBoundingClientRect()
 	return {
 		x: event.clientX - rect.left,

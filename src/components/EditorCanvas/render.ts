@@ -13,7 +13,7 @@ function drawPreviewRect(
 	runtime: EditorState["session"],
 ) {
 	const phase = runtime.mode
-	if (phase.kind !== "dragging") return
+	if (phase.kind !== "drawingRect") return
 
 	const tempRect = normaliseRect(phase.origin, phase.current, createShapeId())
 
@@ -31,7 +31,12 @@ export function render(canvas: HTMLCanvasElement, state: EditorState) {
 
 	drawPreviewRect(context, state.session)
 
-	for (const [_shapeId, shape] of state.doc.shapes) {
+	const doc = state.doc
+
+	for (const shapeId of doc.shapeOrder) {
+		const shape = doc.shapes.get(shapeId)
+		if (shape == null) return
+
 		drawRect(context, shape)
 	}
 }
