@@ -1,3 +1,4 @@
+import { createPointerId } from "@/components/EditorCanvas/helpers/createPointerId"
 import type { EditorEvent } from "../types"
 
 type CanvasPosition = { x: number; y: number }
@@ -24,7 +25,7 @@ export function normalisePointerEvent(
 
 	return {
 		type,
-		pointerId: String(event.pointerId),
+		pointerId: createPointerId(event.pointerId),
 		position,
 	}
 }

@@ -1,6 +1,14 @@
-import type { Point, Rect } from "@/components/EditorCanvas/types"
+import type {
+	CanvasPoint,
+	Rect,
+	ShapeId,
+} from "@/components/EditorCanvas/types"
 
-export function normaliseRect(origin: Point, current: Point, id: string): Rect {
+export function normaliseRect(
+	origin: CanvasPoint,
+	current: CanvasPoint,
+	id: ShapeId,
+): Rect {
 	const left = Math.min(origin.x, current.x)
 	const top = Math.min(origin.y, current.y)
 
@@ -9,7 +17,9 @@ export function normaliseRect(origin: Point, current: Point, id: string): Rect {
 
 	return {
 		id,
-		origin: { x: left, y: top },
-		size: { width, height },
+		x: left,
+		y: top,
+		width,
+		height,
 	}
 }

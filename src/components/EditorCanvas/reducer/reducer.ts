@@ -1,3 +1,4 @@
+import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
 import type {
 	EditorEvent,
@@ -15,8 +16,15 @@ export function createInitialState(): EditorState {
 		doc: {
 			shapes: new Map(),
 		},
-		runtime: {
-			pointer: { kind: "idle" },
+		session: {
+			mode: { kind: "idle" },
+		},
+		debug: {
+			metrics: {
+				lastFrameMs: null,
+				shapeCount: 0,
+			},
+			devLog: [],
 		},
 	}
 }
@@ -24,9 +32,9 @@ export function createInitialState(): EditorState {
 function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
 	return {
 		...prev,
-		runtime: {
-			...prev.runtime,
-			pointer: {
+		session: {
+			...prev.session,
+			mode: {
 				kind: "dragging",
 				id: event.pointerId,
 				origin: event.position,
@@ -37,15 +45,15 @@ function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
 }
 
 function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.runtime.pointer.kind !== "dragging") return prev
-	if (prev.runtime.pointer.id !== event.pointerId) return prev
+	if (prev.session.mode.kind !== "dragging") return prev
+	if (prev.session.mode.id !== event.pointerId) return prev
 
 	return {
 		...prev,
-		runtime: {
-			...prev.runtime,
-			pointer: {
-				...prev.runtime.pointer,
+		session: {
+			...prev.session,
+			mode: {
+				...prev.session.mode,
 				current: event.position,
 			},
 		},
@@ -53,23 +61,26 @@ function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
 }
 
 function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.runtime.pointer.kind !== "dragging") return prev
-	if (prev.runtime.pointer.id !== event.pointerId) return prev
+	if (prev.session.mode.kind !== "dragging") return prev
+	if (prev.session.mode.id !== event.pointerId) return prev
 
-	const origin = prev.runtime.pointer.origin
+	const origin = prev.session.mode.origin
 	const current = event.position
 
-	const rect = normaliseRect(origin, current, crypto.randomUUID())
+	const rect = normaliseRect(origin, current, createShapeId())
 
 	const shapes = new Map(prev.doc.shapes)
 	shapes.set(rect.id, rect)
 
 	return {
+		...prev,
 		doc: {
+			...prev.doc,
 			shapes,
 		},
-		runtime: {
-			pointer: { kind: "idle" },
+		session: {
+			...prev.session,
+			mode: { kind: "idle" },
 		},
 	}
 }
@@ -77,9 +88,9 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
 function POINTER_CANCEL(prev: EditorState, _event: EditorEvent): EditorState {
 	return {
 		...prev,
-		runtime: {
-			...prev.runtime,
-			pointer: { kind: "idle" },
+		session: {
+			...prev.session,
+			mode: { kind: "idle" },
 		},
 	}
 }
