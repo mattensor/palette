@@ -1,4 +1,5 @@
 import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
+import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
 import type {
 	DevLogEvent,
@@ -83,6 +84,29 @@ function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
 }
 
 function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
+	if (prev.session.mode.kind === "idle") {
+		const shapeId = hitTestTopmostShape(prev.doc, event.position)
+		if (shapeId == null) {
+			if (prev.session.hover.kind === "none") return prev
+
+			return {
+				...prev,
+				session: {
+					...prev.session,
+					hover: { kind: "none" },
+				},
+			}
+		} else {
+			return {
+				...prev,
+				session: {
+					...prev.session,
+					hover: { kind: "shape", id: shapeId },
+				},
+			}
+		}
+	}
+
 	if (prev.session.mode.kind !== "drawingRect") return prev
 	if (prev.session.mode.pointerId !== event.pointerId) return prev
 

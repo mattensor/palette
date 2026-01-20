@@ -1,7 +1,31 @@
 import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
-import type { EditorState, Rect } from "./types"
+import type { EditorState, Rect, ShapeId } from "./types"
 
+function drawHoverOutline(
+	ctx: CanvasRenderingContext2D,
+	sessionState: EditorState["session"],
+	findShapeById: (id: ShapeId) => Rect | undefined,
+	{ color = "yellow", width = 2 } = {},
+) {
+	if (sessionState.hover.kind === "none") return
+
+	const rect = findShapeById(sessionState.hover.id)
+	if (!rect) return
+
+	const half = width / 2
+
+	ctx.save()
+	ctx.strokeStyle = color
+	ctx.lineWidth = width
+	ctx.strokeRect(
+		rect.x - half,
+		rect.y - half,
+		rect.width + width,
+		rect.height + width,
+	)
+	ctx.restore()
+}
 function drawRect(context: CanvasRenderingContext2D, rect: Rect) {
 	context.beginPath()
 	context.rect(rect.x, rect.y, rect.width, rect.height)
@@ -29,14 +53,15 @@ export function render(canvas: HTMLCanvasElement, state: EditorState) {
 
 	context.clearRect(0, 0, canvas.width, canvas.height)
 
-	drawPreviewRect(context, state.session)
-
 	const doc = state.doc
 
 	for (const shapeId of doc.shapeOrder) {
 		const shape = doc.shapes.get(shapeId)
-		if (shape == null) return
+		if (shape == null) continue
 
 		drawRect(context, shape)
 	}
+
+	drawPreviewRect(context, state.session)
+	drawHoverOutline(context, state.session, (id: ShapeId) => doc.shapes.get(id))
 }
