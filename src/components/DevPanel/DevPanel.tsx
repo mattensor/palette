@@ -16,14 +16,30 @@ function getLastN<T>(items: readonly T[], n: number): readonly T[] {
 	return items.slice(Math.max(0, items.length - n))
 }
 
+type DevLogEntry = {
+	ts: number
+	name: string
+	data?: unknown
+}
+
 type LogRow = {
 	key: string
 	tsText: string
 	deltaText: string | null
 	name: string
+	detailText: string | null
 }
 
-function toLogRows(devLog: readonly { ts: number; name: string }[]): LogRow[] {
+function safeStringify(value: unknown): string | null {
+	if (value == null) return null
+	try {
+		return JSON.stringify(value)
+	} catch {
+		return "[data]"
+	}
+}
+
+function toLogRows(devLog: readonly DevLogEntry[]): LogRow[] {
 	return devLog.map((e, idx) => {
 		const prev = idx > 0 ? devLog[idx - 1] : null
 		const delta = prev ? e.ts - prev.ts : null
@@ -33,6 +49,7 @@ function toLogRows(devLog: readonly { ts: number; name: string }[]): LogRow[] {
 			tsText: e.ts.toFixed(1),
 			deltaText: delta == null ? null : `(+${delta.toFixed(1)}ms)`,
 			name: e.name,
+			detailText: safeStringify(e.data),
 		}
 	})
 }
@@ -41,7 +58,9 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 	const { mode, debug } = snapshot
 	const { metrics, devLog } = debug
 
-	const recentLogRows = toLogRows(getLastN(devLog, LOGS_TO_SHOW))
+	// slice first so deltas are correct for what you display
+	const recent = getLastN(devLog as readonly DevLogEntry[], LOGS_TO_SHOW)
+	const recentLogRows = toLogRows(recent)
 
 	return (
 		<div className={styles.panel}>
@@ -72,7 +91,12 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 									<span className={styles.logDelta}>{row.deltaText}</span>
 								)}
 							</div>
+
 							<div className={styles.logName}>{row.name}</div>
+
+							{row.detailText != null && (
+								<div className={styles.logDetail}>{row.detailText}</div>
+							)}
 						</div>
 					))
 				)}

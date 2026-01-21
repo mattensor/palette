@@ -241,7 +241,7 @@ describe("pointerReducer", () => {
 	})
 
 	describe("POINTER_UP", () => {
-		it("ends drawingRect and returns to idle for matching pointerId", () => {
+		it("ends drawingRect and returns to idle for matching pointerId (emits COMMIT_DRAW_RECT)", () => {
 			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
@@ -263,7 +263,14 @@ describe("pointerReducer", () => {
 
 			const res = pointerReducer(prev, event)
 
-			expect(res.effects).toEqual([])
+			expect(res.effects).toEqual([
+				{
+					type: "COMMIT_DRAW_RECT",
+					origin: createPoint(0, 0), // from mode snapshot
+					current: createPoint(5, 5), // from pointer up position
+				},
+			])
+
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual(prev.session.hover)
 		})

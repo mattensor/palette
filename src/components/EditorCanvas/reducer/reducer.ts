@@ -1,206 +1,33 @@
-import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
-import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
-import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
-import type {
-	DevLogEvent,
-	EditorEvent,
-	EditorEventType,
-	EditorState,
-} from "@/components/EditorCanvas/types"
+import { withDevLog } from "@/components/EditorCanvas/reducer/devLog"
+import { docReducer } from "@/components/EditorCanvas/reducer/docReducer"
+import { pointerReducer } from "@/components/EditorCanvas/reducer/pointerReducer"
+import type { EditorEvent, EditorState } from "@/components/EditorCanvas/types"
 
-type EditorReducerHandler = (
-	prev: EditorState,
-	event: EditorEvent,
-) => EditorState
+export function reducer(prev: EditorState, event: EditorEvent): EditorState {
+	const { session, effects } = pointerReducer(prev, event)
 
-const DEVLOG_MAX = 200
-
-function pushDevLog(prev: EditorState, entry: DevLogEvent): EditorState {
-	const next = [...prev.debug.devLog, entry]
-	const capped =
-		next.length > DEVLOG_MAX ? next.slice(next.length - DEVLOG_MAX) : next
-
-	return {
-		...prev,
-		debug: {
-			...prev.debug,
-			devLog: capped,
-		},
-	}
-}
-
-function log(prev: EditorState, name: string, data?: unknown): EditorState {
-	return pushDevLog(prev, {
-		ts: performance.now(),
-		name,
-		data,
-	})
-}
-
-export function createInitialState(): EditorState {
-	return {
-		doc: {
-			shapes: new Map(),
-			shapeOrder: [],
-		},
-		session: {
-			mode: { kind: "idle" },
-			selection: { kind: "none" },
-			hover: { kind: "none" },
-		},
-		debug: {
-			metrics: {
-				lastRenderMs: null,
-				shapeCount: 0,
-			},
-			devLog: [],
-		},
-	}
-}
-
-function POINTER_DOWN(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.session.mode.kind !== "idle") return prev
+	const doc = effects.reduce(docReducer, prev.doc)
 
 	let next: EditorState = {
 		...prev,
-		session: {
-			...prev.session,
-			mode: {
-				kind: "drawingRect",
-				pointerId: event.pointerId,
-				origin: event.position,
-				current: event.position,
-			},
-		},
+		doc,
+		session,
 	}
 
-	next = log(next, "pointer/down", {
-		pointerId: event.pointerId,
-		pos: event.position,
-	})
-	next = log(next, "mode/change", { from: "idle", to: "drawingRect" })
-
-	return next
-}
-
-function POINTER_MOVE(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.session.mode.kind === "idle") {
-		const shapeId = hitTestTopmostShape(prev.doc, event.position)
-		if (shapeId == null) {
-			if (prev.session.hover.kind === "none") return prev
-
-			return {
-				...prev,
-				session: {
-					...prev.session,
-					hover: { kind: "none" },
+	if (doc !== prev.doc) {
+		next = {
+			...next,
+			debug: {
+				...next.debug,
+				metrics: {
+					...next.debug.metrics,
+					shapeCount: doc.shapes.size,
 				},
-			}
-		} else {
-			return {
-				...prev,
-				session: {
-					...prev.session,
-					hover: { kind: "shape", id: shapeId },
-				},
-			}
+			},
 		}
 	}
 
-	if (prev.session.mode.kind !== "drawingRect") return prev
-	if (prev.session.mode.pointerId !== event.pointerId) return prev
-
-	// No logging here (too noisy)
-	return {
-		...prev,
-		session: {
-			...prev.session,
-			mode: {
-				...prev.session.mode,
-				current: event.position,
-			},
-		},
-	}
-}
-
-function POINTER_UP(prev: EditorState, event: EditorEvent): EditorState {
-	if (prev.session.mode.kind !== "drawingRect") return prev
-	if (prev.session.mode.pointerId !== event.pointerId) return prev
-
-	const origin = prev.session.mode.origin
-	const current = event.position
-
-	const newShapeId = createShapeId()
-	const rect = normaliseRect(origin, current, newShapeId)
-
-	const shapes = new Map(prev.doc.shapes)
-	shapes.set(rect.id, rect)
-
-	let next: EditorState = {
-		...prev,
-		doc: {
-			...prev.doc,
-			shapes,
-			shapeOrder: [...prev.doc.shapeOrder, newShapeId],
-		},
-		session: {
-			...prev.session,
-			mode: { kind: "idle" },
-		},
-		debug: {
-			...prev.debug,
-			metrics: {
-				...prev.debug.metrics,
-				shapeCount: shapes.size,
-			},
-		},
-	}
-
-	next = log(next, "pointer/up", {
-		pointerId: event.pointerId,
-		pos: event.position,
-	})
-	next = log(next, "shape/commit", {
-		id: rect.id,
-		x: rect.x,
-		y: rect.y,
-		width: rect.width,
-		height: rect.height,
-	})
-	next = log(next, "mode/change", { from: "drawingRect", to: "idle" })
+	next = withDevLog({ prev, next, effects })
 
 	return next
-}
-
-function POINTER_CANCEL(prev: EditorState, event: EditorEvent): EditorState {
-	const from = prev.session.mode.kind
-
-	let next: EditorState = {
-		...prev,
-		session: {
-			...prev.session,
-			mode: { kind: "idle" },
-		},
-	}
-
-	next = log(next, "pointer/cancel", {
-		pointerId: event.pointerId,
-		pos: event.position,
-	})
-	if (from !== "idle") next = log(next, "mode/change", { from, to: "idle" })
-
-	return next
-}
-
-const handlers: Record<EditorEventType, EditorReducerHandler> = {
-	POINTER_DOWN,
-	POINTER_MOVE,
-	POINTER_UP,
-	POINTER_CANCEL,
-}
-
-export function reducer(prev: EditorState, event: EditorEvent): EditorState {
-	const handler = handlers[event.type]
-
-	return handler ? handler(prev, event) : prev
 }

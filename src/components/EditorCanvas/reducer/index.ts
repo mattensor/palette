@@ -1,1 +1,2 @@
-export * from "./reducer"
+export { createInitialState } from "./createInitialState"
+export { reducer } from "./reducer"

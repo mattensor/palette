@@ -90,12 +90,19 @@ function POINTER_UP(prev: EditorState, event: EditorEvent): PointerResult {
 	if (prev.session.mode.kind !== "drawingRect") return noop(prev)
 	if (prev.session.mode.pointerId !== event.pointerId) return noop(prev)
 
+	// Pointer reducer emits intent only; doc layer creates ids + normalizes shapes.
+	const effect: DocEffect = {
+		type: "COMMIT_DRAW_RECT",
+		origin: prev.session.mode.origin,
+		current: event.position,
+	}
+
 	return {
 		session: {
 			...prev.session,
 			mode: { kind: "idle" },
 		},
-		effects: [],
+		effects: [effect],
 	}
 }
 

@@ -1,9 +1,31 @@
 import type {
 	CanvasPoint,
-	Rect,
+	DocumentState,
 	ShapeId,
 } from "@/components/EditorCanvas/types"
 
 export type DocEffect =
-	| { type: "DOC/ADD_RECT"; rect: Rect }
-	| { type: "DOC/MOVE_SHAPE"; id: ShapeId; x: CanvasPoint; y: CanvasPoint }
+	| {
+			type: "COMMIT_DRAW_RECT"
+			origin: CanvasPoint
+			current: CanvasPoint
+	  }
+	| {
+			type: "MOVE_SHAPE"
+			id: ShapeId
+			dx: number
+			dy: number
+	  }
+
+export type DocEffectType = DocEffect["type"]
+
+export type DocEffectByType = {
+	[K in DocEffectType]: Extract<DocEffect, { type: K }>
+}
+
+export type DocEffectHandlerMap = {
+	[K in DocEffectType]?: (
+		prev: DocumentState,
+		effect: DocEffectByType[K],
+	) => DocumentState
+}
