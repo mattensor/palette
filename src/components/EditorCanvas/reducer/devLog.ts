@@ -4,6 +4,7 @@ import type { EditorState } from "@/components/EditorCanvas/types"
 export type DevLogName =
 	| "session/mode_changed"
 	| "session/hover_changed"
+	| "session/selection_changed"
 	| "doc/rect_added"
 
 export type DevLogEntry = {
@@ -80,6 +81,14 @@ export function withDevLog(args: {
 		next = log(next, "session/hover_changed", {
 			from: prev.session.hover,
 			to: next.session.hover,
+		})
+	}
+
+	// selection change
+	if (prev.session.selection !== next.session.selection) {
+		next = log(next, "session/selection_changed", {
+			from: prev.session.selection,
+			to: next.session.selection,
 		})
 	}
 

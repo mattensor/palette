@@ -1,6 +1,7 @@
 import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
 import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
 import type {
+	CanvasPoint,
 	EditorEvent,
 	EditorEventType,
 	EditorState,
@@ -44,11 +45,25 @@ function updateHover(
 	}
 }
 
+const MIN_DRAG = 3
+
+function hasDragged(a: CanvasPoint, b: CanvasPoint) {
+	return Math.abs(a.x - b.x) > MIN_DRAG || Math.abs(a.y - b.y) > MIN_DRAG
+}
+
 function POINTER_DOWN(prev: EditorState, event: EditorEvent): PointerResult {
 	if (prev.session.mode.kind !== "idle") return noop(prev)
 
 	const hitShapeId = hitTestTopmostShape(prev.doc, event.position)
-	if (hitShapeId != null) return noop(prev)
+	if (hitShapeId != null) {
+		return {
+			session: {
+				...prev.session,
+				selection: { kind: "shape", id: hitShapeId },
+			},
+			effects: [],
+		}
+	}
 
 	return {
 		session: {
@@ -60,6 +75,7 @@ function POINTER_DOWN(prev: EditorState, event: EditorEvent): PointerResult {
 				current: event.position,
 			},
 			hover: { kind: "none" },
+			selection: { kind: "none" },
 		},
 		effects: [],
 	}
@@ -89,6 +105,16 @@ function POINTER_MOVE(prev: EditorState, event: EditorEvent): PointerResult {
 function POINTER_UP(prev: EditorState, event: EditorEvent): PointerResult {
 	if (prev.session.mode.kind !== "drawingRect") return noop(prev)
 	if (prev.session.mode.pointerId !== event.pointerId) return noop(prev)
+
+	if (!hasDragged(prev.session.mode.origin, event.position)) {
+		return {
+			session: {
+				...prev.session,
+				mode: { kind: "idle" },
+			},
+			effects: [],
+		}
+	}
 
 	// Pointer reducer emits intent only; doc layer creates ids + normalizes shapes.
 	const effect: DocEffect = {

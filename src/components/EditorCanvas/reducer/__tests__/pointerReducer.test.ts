@@ -53,7 +53,7 @@ describe("pointerReducer", () => {
 			expect(res.effects).toEqual([])
 		})
 
-		it("noops if clicking on a shape (hitTest returns id)", () => {
+		it("sets selection to shape when clicking on a shape (hitTest returns id)", () => {
 			hitTestMock.mockReturnValue(createShapeId("shape-1"))
 
 			const prev = editorStateFactory()
@@ -66,17 +66,21 @@ describe("pointerReducer", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(hitTestMock).toHaveBeenCalledWith(prev.doc, event.position)
-			expect(res.session).toBe(prev.session)
+			expect(res.session.selection).toEqual({
+				kind: "shape",
+				id: "shape-1",
+			})
 			expect(res.effects).toEqual([])
 		})
 
-		it("starts drawingRect when clicking empty canvas and clears hover", () => {
+		it("starts drawingRect when clicking empty canvas, clears hover and selection", () => {
 			hitTestMock.mockReturnValue(null)
 
 			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					hover: { kind: "shape", id: createShapeId("old-hover") },
+					selection: { kind: "shape", id: createShapeId("old-selection") },
 				},
 			})
 
@@ -96,7 +100,7 @@ describe("pointerReducer", () => {
 				current: createPoint(10, 20),
 			})
 			expect(res.session.hover).toEqual({ kind: "none" })
-			expect(res.session.selection).toEqual(prev.session.selection)
+			expect(res.session.selection).toEqual({ kind: "none" })
 		})
 	})
 

@@ -2,11 +2,11 @@ import type { PointerEvent } from "react"
 import { useEffect, useRef, useState } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
 import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
+import type { EditorEvent } from "@/components/EditorCanvas/types"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import { createInitialState, reducer } from "./reducer"
 import { render } from "./render"
 import styles from "./styles.module.css"
-import type { EditorEvent } from ".//types"
 
 export function EditorCanvas() {
 	const hostRef = useRef<HTMLDivElement>(null)
@@ -25,12 +25,12 @@ export function EditorCanvas() {
 	useEffect(() => {
 		const id = window.setInterval(() => {
 			const s = editorStateRef.current
-			// Shallow snapshot is enough since you're replacing state in the reducer.
+			// Shallow snapshot is enough since we're replacing state in the reducer.
 			setDebugSnapshot({
 				mode: s.session.mode,
 				debug: s.debug,
 			})
-		}, 100) // 10 fps
+		}, 100)
 
 		return () => window.clearInterval(id)
 	}, [])

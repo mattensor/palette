@@ -60,7 +60,7 @@ export type Mode =
 			startRect: Rect
 	  }
 
-export type Selection = { kind: "none" } | { kind: "single"; id: ShapeId }
+export type Selection = { kind: "none" } | { kind: "shape"; id: ShapeId }
 
 export type Hover = { kind: "none" } | { kind: "shape"; id: ShapeId }
 
