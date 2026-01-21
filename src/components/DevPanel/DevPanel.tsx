@@ -60,7 +60,7 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 
 	// slice first so deltas are correct for what you display
 	const recent = getLastN(devLog as readonly DevLogEntry[], LOGS_TO_SHOW)
-	const recentLogRows = toLogRows(recent)
+	const recentLogRows = toLogRows(recent).reverse()
 
 	return (
 		<div className={styles.panel}>
