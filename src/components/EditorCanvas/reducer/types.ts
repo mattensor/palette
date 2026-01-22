@@ -11,10 +11,10 @@ export type DocEffect =
 			current: CanvasPoint
 	  }
 	| {
-			type: "MOVE_SHAPE"
+			type: "SET_SHAPE_POSITION"
 			id: ShapeId
-			dx: number
-			dy: number
+			x: number
+			y: number
 	  }
 
 export type DocEffectType = DocEffect["type"]

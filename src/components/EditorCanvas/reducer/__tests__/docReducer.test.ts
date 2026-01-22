@@ -119,15 +119,42 @@ describe("docReducer", () => {
 		})
 	})
 
-	describe("MOVE_SHAPE", () => {
-		it("noops (Day 2 stub)", () => {
+	describe("SET_SHAPE_POSITION", () => {
+		it("updates the shape position immutably when shape exists", () => {
+			const id = createShapeIdT("shape-1")
+			const rect: Rect = { id, x: 10, y: 20, width: 3, height: 4 }
+
+			const prev = createDocState({
+				shapes: new Map([[id, rect]]),
+				shapeOrder: [id],
+			})
+
+			const next = docReducer(prev, {
+				type: "SET_SHAPE_POSITION",
+				id,
+				x: 111,
+				y: 222,
+			})
+
+			expect(next).not.toBe(prev)
+			expect(next.shapes).not.toBe(prev.shapes)
+			expect(next.shapeOrder).toBe(prev.shapeOrder) // unchanged array reference is fine
+
+			expect(next.shapes.get(id)).toEqual({
+				...rect,
+				x: 111,
+				y: 222,
+			})
+		})
+
+		it("noops (returns prev) when shape does not exist", () => {
 			const prev = createDocState()
 
 			const next = docReducer(prev, {
-				type: "MOVE_SHAPE",
-				id: createShapeIdT("shape-1"),
-				dx: 5,
-				dy: -3,
+				type: "SET_SHAPE_POSITION",
+				id: createShapeIdT("missing"),
+				x: 1,
+				y: 2,
 			})
 
 			expect(next).toBe(prev)

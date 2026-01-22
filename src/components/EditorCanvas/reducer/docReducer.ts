@@ -31,16 +31,31 @@ function COMMIT_DRAW_RECT(
 	}
 }
 
-function MOVE_SHAPE(
+function SET_SHAPE_POSITION(
 	prev: DocumentState,
-	_effect: DocEffectByType["MOVE_SHAPE"],
+	effect: DocEffectByType["SET_SHAPE_POSITION"],
 ): DocumentState {
-	return prev
+	const shape = prev.shapes.get(effect.id)
+	if (shape == null) return prev
+
+	const updated = {
+		...shape,
+		x: effect.x,
+		y: effect.y,
+	}
+
+	const shapes = new Map(prev.shapes)
+	shapes.set(updated.id, updated)
+
+	return {
+		...prev,
+		shapes,
+	}
 }
 
 const docEffectHandlers: HandlerMap = {
 	COMMIT_DRAW_RECT,
-	MOVE_SHAPE,
+	SET_SHAPE_POSITION,
 }
 
 export function docReducer(

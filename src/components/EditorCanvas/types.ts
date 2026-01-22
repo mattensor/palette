@@ -44,8 +44,23 @@ export type DebugState = {
 	devLog: readonly DevLogEvent[]
 }
 
+export type Intent =
+	| { kind: "drawRect" }
+	| {
+			kind: "dragSelection"
+			shapeId: ShapeId
+			startPointer: CanvasPoint
+			startRect: Rect
+	  }
+
 export type Mode =
 	| { kind: "idle" }
+	| {
+			kind: "armed"
+			origin: CanvasPoint
+			current: CanvasPoint
+			intent: Intent
+	  }
 	| {
 			kind: "drawingRect"
 			pointerId: PointerId

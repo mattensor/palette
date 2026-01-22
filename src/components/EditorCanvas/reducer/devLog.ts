@@ -85,7 +85,7 @@ export function withDevLog(args: {
 	}
 
 	// selection change
-	if (prev.session.selection !== next.session.selection) {
+	if (prev.session.selection.kind !== next.session.selection.kind) {
 		next = log(next, "session/selection_changed", {
 			from: prev.session.selection,
 			to: next.session.selection,
