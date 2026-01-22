@@ -4,6 +4,8 @@ type Brand<K, T extends string> = K & { readonly __brand: T }
 export type PointerId = Brand<string, "PointerId">
 export type ShapeId = Brand<string, "ShapeId">
 
+export type Key = "Delete" | "Backspace" | "Escape"
+
 export type EditorEvent =
 	| {
 			type: "POINTER_DOWN"
@@ -25,8 +27,23 @@ export type EditorEvent =
 			pointerId: PointerId
 			position: CanvasPoint
 	  }
+	| { type: "KEY_DOWN"; key: Key }
 
 export type EditorEventType = EditorEvent["type"]
+
+export type PointerEditorEvent = Extract<
+	EditorEvent,
+	{ type: PointerEventType }
+>
+
+export type PointerEventType = Extract<
+	EditorEventType,
+	"POINTER_DOWN" | "POINTER_MOVE" | "POINTER_UP" | "POINTER_CANCEL"
+>
+
+export type KeyboardEditorEvent = Extract<EditorEvent, { type: "KEY_DOWN" }>
+
+export type KeyboardEventType = Extract<EditorEventType, "KEY_DOWN">
 
 export type Metrics = {
 	lastRenderMs: number | null

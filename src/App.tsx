@@ -1,13 +1,11 @@
 import "./App.css"
-import { Editor } from "@/components/Editor"
-import { Sidebar } from "@/components/Sidebar"
+import { EditorCanvas } from "@/components/EditorCanvas"
 import styles from "./styles.module.css"
 
 function App() {
 	return (
 		<div className={styles.app}>
-			<Sidebar />
-			<Editor />
+			<EditorCanvas />
 		</div>
 	)
 }

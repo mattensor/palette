@@ -3,10 +3,10 @@ import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
 import type {
 	CanvasPoint,
 	DocumentState,
-	EditorEvent,
-	EditorEventType,
 	EditorState,
 	Mode,
+	PointerEditorEvent,
+	PointerEventType,
 	Rect,
 	SessionState,
 	ShapeId,
@@ -15,7 +15,7 @@ import type {
 type PointerResult = { session: SessionState; effects: DocEffect[] }
 type PointerEventHandler = (
 	prev: EditorState,
-	event: EditorEvent,
+	event: PointerEditorEvent,
 ) => PointerResult
 
 function noop(prev: EditorState): PointerResult {
@@ -52,11 +52,7 @@ function hasDragged(a: CanvasPoint, b: CanvasPoint) {
 	return Math.abs(a.x - b.x) > MIN_DRAG || Math.abs(a.y - b.y) > MIN_DRAG
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function samePointer(mode: { pointerId: unknown }, event: EditorEvent) {
+function samePointer(mode: { pointerId: unknown }, event: PointerEditorEvent) {
 	return mode.pointerId === event.pointerId
 }
 
@@ -75,10 +71,6 @@ function getRect(doc: DocumentState, id: ShapeId): Rect | null {
 	return doc.shapes.get(id) ?? null
 }
 
-// ---------------------------------------------------------------------------
-// Mode-keyed handler tables (with proper narrowing)
-// ---------------------------------------------------------------------------
-
 type ModeKind = Mode["kind"]
 type ModeOf<K extends ModeKind> = Extract<Mode, { kind: K }>
 type StateWithMode<K extends ModeKind> = EditorState & {
@@ -87,26 +79,22 @@ type StateWithMode<K extends ModeKind> = EditorState & {
 type ModeHandlerMap = {
 	[K in ModeKind]?: (
 		prev: StateWithMode<K>,
-		event: EditorEvent,
+		event: PointerEditorEvent,
 	) => PointerResult
 }
 
 function handleByMode(
 	handlers: ModeHandlerMap,
 	prev: EditorState,
-	event: EditorEvent,
+	event: PointerEditorEvent,
 ): PointerResult {
 	const kind = prev.session.mode.kind
 	const handler = handlers[kind] as
-		| ((p: EditorState, e: EditorEvent) => PointerResult)
+		| ((p: EditorState, e: PointerEditorEvent) => PointerResult)
 		| undefined
 
 	return handler ? handler(prev, event) : noop(prev)
 }
-
-// ---------------------------------------------------------------------------
-// Shared effects
-// ---------------------------------------------------------------------------
 
 function moveSelectionEffect(
 	id: ShapeId,
@@ -133,10 +121,6 @@ function cancelToIdle(prev: EditorState): PointerResult {
 		effects: [],
 	}
 }
-
-// ---------------------------------------------------------------------------
-// POINTER_DOWN
-// ---------------------------------------------------------------------------
 
 const downByMode: ModeHandlerMap = {
 	idle(prev, event) {
@@ -186,13 +170,12 @@ const downByMode: ModeHandlerMap = {
 	},
 }
 
-function POINTER_DOWN(prev: EditorState, event: EditorEvent): PointerResult {
+function POINTER_DOWN(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
 	return handleByMode(downByMode, prev, event)
 }
-
-// ---------------------------------------------------------------------------
-// POINTER_MOVE
-// ---------------------------------------------------------------------------
 
 const moveByMode: ModeHandlerMap = {
 	idle(prev, event) {
@@ -275,13 +258,12 @@ const moveByMode: ModeHandlerMap = {
 	},
 }
 
-function POINTER_MOVE(prev: EditorState, event: EditorEvent): PointerResult {
+function POINTER_MOVE(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
 	return handleByMode(moveByMode, prev, event)
 }
-
-// ---------------------------------------------------------------------------
-// POINTER_UP
-// ---------------------------------------------------------------------------
 
 const upByMode: ModeHandlerMap = {
 	armed(prev, event) {
@@ -320,13 +302,12 @@ const upByMode: ModeHandlerMap = {
 	},
 }
 
-function POINTER_UP(prev: EditorState, event: EditorEvent): PointerResult {
+function POINTER_UP(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
 	return handleByMode(upByMode, prev, event)
 }
-
-// ---------------------------------------------------------------------------
-// POINTER_CANCEL
-// ---------------------------------------------------------------------------
 
 const cancelByMode: ModeHandlerMap = {
 	idle(prev) {
@@ -349,15 +330,14 @@ const cancelByMode: ModeHandlerMap = {
 	},
 }
 
-function POINTER_CANCEL(prev: EditorState, event: EditorEvent): PointerResult {
+function POINTER_CANCEL(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
 	return handleByMode(cancelByMode, prev, event)
 }
 
-// ---------------------------------------------------------------------------
-// Top-level routing
-// ---------------------------------------------------------------------------
-
-const pointerEventHandlers: Record<EditorEventType, PointerEventHandler> = {
+const pointerEventHandlers: Record<PointerEventType, PointerEventHandler> = {
 	POINTER_DOWN,
 	POINTER_MOVE,
 	POINTER_UP,
@@ -366,7 +346,7 @@ const pointerEventHandlers: Record<EditorEventType, PointerEventHandler> = {
 
 export function pointerReducer(
 	prev: EditorState,
-	event: EditorEvent,
+	event: PointerEditorEvent,
 ): PointerResult {
 	const handler = pointerEventHandlers[event.type]
 	return handler ? handler(prev, event) : noop(prev)

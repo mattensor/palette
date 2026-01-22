@@ -53,9 +53,26 @@ function SET_SHAPE_POSITION(
 	}
 }
 
+function REMOVE_SHAPE(
+	prev: DocumentState,
+	effect: DocEffectByType["REMOVE_SHAPE"],
+): DocumentState {
+	const shapes = new Map(prev.shapes)
+	shapes.delete(effect.id)
+
+	const shapeOrder = prev.shapeOrder.filter((shapeId) => shapeId !== effect.id)
+
+	return {
+		...prev,
+		shapes,
+		shapeOrder,
+	}
+}
+
 const docEffectHandlers: HandlerMap = {
 	COMMIT_DRAW_RECT,
 	SET_SHAPE_POSITION,
+	REMOVE_SHAPE,
 }
 
 export function docReducer(

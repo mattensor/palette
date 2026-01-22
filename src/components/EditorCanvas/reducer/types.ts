@@ -16,6 +16,10 @@ export type DocEffect =
 			x: number
 			y: number
 	  }
+	| {
+			type: "REMOVE_SHAPE"
+			id: ShapeId
+	  }
 
 export type DocEffectType = DocEffect["type"]
 
