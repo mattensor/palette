@@ -57,8 +57,8 @@ export type Mode =
 	| { kind: "idle" }
 	| {
 			kind: "armed"
+			pointerId: PointerId
 			origin: CanvasPoint
-			current: CanvasPoint
 			intent: Intent
 	  }
 	| {

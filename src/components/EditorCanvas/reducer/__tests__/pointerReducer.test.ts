@@ -82,8 +82,8 @@ describe("pointerReducer", () => {
 			expect(res.session.hover).toEqual({ kind: "none" })
 			expect(res.session.mode).toEqual({
 				kind: "armed",
+				pointerId: createPointerId("p1"),
 				origin: event.position,
-				current: event.position,
 				intent: {
 					kind: "dragSelection",
 					shapeId,
@@ -115,8 +115,8 @@ describe("pointerReducer", () => {
 			expect(res.effects).toEqual([])
 			expect(res.session.mode).toEqual({
 				kind: "armed",
+				pointerId: createPointerId("p1"),
 				origin: event.position,
-				current: event.position,
 				intent: { kind: "drawRect" },
 			})
 			expect(res.session.hover).toEqual({ kind: "none" })
@@ -198,6 +198,32 @@ describe("pointerReducer", () => {
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(1, 2),
+			})
+
+			const res = pointerReducer(prev, event)
+			expect(res.session).toBe(prev.session)
+			expect(res.effects).toEqual([])
+		})
+
+		it("armed drawRect: noops for non-active pointerId", () => {
+			hitTestMock.mockReturnValue(null)
+
+			const prev = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					mode: {
+						kind: "armed",
+						pointerId: createPointerId("p1"),
+						origin: createPoint(0, 0),
+						intent: { kind: "drawRect" },
+					},
+				},
+			})
+
+			const event = editorEventFactory({
+				type: "POINTER_MOVE",
+				pointerId: createPointerId("p2"),
+				position: createPoint(10, 0),
 			})
 
 			const res = pointerReducer(prev, event)
@@ -399,14 +425,14 @@ describe("pointerReducer", () => {
 	})
 
 	describe("POINTER_UP", () => {
-		it("armed: returns to idle and emits no effects", () => {
+		it("armed: returns to idle and emits no effects (matching pointerId)", () => {
 			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					mode: {
 						kind: "armed",
+						pointerId: createPointerId("p1"),
 						origin: createPoint(0, 0),
-						current: createPoint(0, 0),
 						intent: { kind: "drawRect" },
 					},
 				},
@@ -422,6 +448,30 @@ describe("pointerReducer", () => {
 
 			expect(res.effects).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
+		})
+
+		it("armed: noops for non-matching pointerId", () => {
+			const prev = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					mode: {
+						kind: "armed",
+						pointerId: createPointerId("p1"),
+						origin: createPoint(0, 0),
+						intent: { kind: "drawRect" },
+					},
+				},
+			})
+
+			const event = editorEventFactory({
+				type: "POINTER_UP",
+				pointerId: createPointerId("p2"),
+				position: createPoint(0, 0),
+			})
+
+			const res = pointerReducer(prev, event)
+			expect(res.session).toBe(prev.session)
+			expect(res.effects).toEqual([])
 		})
 
 		it("ends drawingRect and returns to idle for matching pointerId (emits COMMIT_DRAW_RECT)", () => {
@@ -551,7 +601,7 @@ describe("pointerReducer", () => {
 	})
 
 	describe("POINTER_CANCEL", () => {
-		it("resets mode to idle and clears hover", () => {
+		it("resets mode to idle and clears hover (matching pointerId for active modes)", () => {
 			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
@@ -577,6 +627,31 @@ describe("pointerReducer", () => {
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual({ kind: "none" })
 			expect(res.session.selection).toEqual(prev.session.selection)
+		})
+
+		it("noops if pointerId doesn't match active mode pointerId", () => {
+			const prev = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					mode: {
+						kind: "drawingRect",
+						pointerId: createPointerId("p1"),
+						origin: createPoint(0, 0),
+						current: createPoint(5, 5),
+					},
+					hover: { kind: "shape", id: createShapeId("shape-1") },
+				},
+			})
+
+			const event = editorEventFactory({
+				type: "POINTER_CANCEL",
+				pointerId: createPointerId("p2"),
+				position: createPoint(999, 999),
+			})
+
+			const res = pointerReducer(prev, event)
+			expect(res.session).toBe(prev.session)
+			expect(res.effects).toEqual([])
 		})
 	})
 

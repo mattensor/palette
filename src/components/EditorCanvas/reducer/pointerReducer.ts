@@ -53,7 +53,7 @@ function hasDragged(a: CanvasPoint, b: CanvasPoint) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers you asked for
+// Helpers
 // ---------------------------------------------------------------------------
 
 function samePointer(mode: { pointerId: unknown }, event: EditorEvent) {
@@ -116,7 +116,6 @@ function moveSelectionEffect(
 ): DocEffect {
 	const d = delta(startPointer, currentPointer)
 	const pos = translateRect(startRect, d)
-
 	return { type: "SET_SHAPE_POSITION", id, x: pos.x, y: pos.y }
 }
 
@@ -150,8 +149,8 @@ const downByMode: ModeHandlerMap = {
 					...prev.session,
 					mode: {
 						kind: "armed",
+						pointerId: event.pointerId,
 						origin: event.position,
-						current: event.position,
 						intent: { kind: "drawRect" },
 					},
 					hover: { kind: "none" },
@@ -170,8 +169,8 @@ const downByMode: ModeHandlerMap = {
 				...prev.session,
 				mode: {
 					kind: "armed",
+					pointerId: event.pointerId,
 					origin: event.position,
-					current: event.position,
 					intent: {
 						kind: "dragSelection",
 						shapeId: hitShapeId,
@@ -201,8 +200,10 @@ const moveByMode: ModeHandlerMap = {
 	},
 
 	armed(prev, event) {
-		const { origin, intent } = prev.session.mode
+		const m = prev.session.mode
+		if (!samePointer(m, event)) return noop(prev)
 
+		const { origin, intent, pointerId } = m
 		if (!hasDragged(origin, event.position)) return noop(prev)
 
 		if (intent.kind === "drawRect") {
@@ -211,7 +212,7 @@ const moveByMode: ModeHandlerMap = {
 					...prev.session,
 					mode: {
 						kind: "drawingRect",
-						pointerId: event.pointerId,
+						pointerId, // use armed pointerId
 						origin,
 						current: event.position,
 					},
@@ -234,7 +235,7 @@ const moveByMode: ModeHandlerMap = {
 					mode: {
 						kind: "draggingSelection",
 						shapeId: intent.shapeId,
-						pointerId: event.pointerId,
+						pointerId, // use armed pointerId
 						startPointer: intent.startPointer,
 						startRect: intent.startRect,
 					},
@@ -283,7 +284,9 @@ function POINTER_MOVE(prev: EditorState, event: EditorEvent): PointerResult {
 // ---------------------------------------------------------------------------
 
 const upByMode: ModeHandlerMap = {
-	armed(prev) {
+	armed(prev, event) {
+		const m = prev.session.mode
+		if (!samePointer(m, event)) return noop(prev)
 		return toIdle(prev)
 	},
 
@@ -330,13 +333,19 @@ const cancelByMode: ModeHandlerMap = {
 	idle(prev) {
 		return cancelToIdle(prev)
 	},
-	armed(prev) {
+	armed(prev, event) {
+		const m = prev.session.mode
+		if (!samePointer(m, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
-	drawingRect(prev) {
+	drawingRect(prev, event) {
+		const m = prev.session.mode
+		if (!samePointer(m, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
-	draggingSelection(prev) {
+	draggingSelection(prev, event) {
+		const m = prev.session.mode
+		if (!samePointer(m, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
 }
