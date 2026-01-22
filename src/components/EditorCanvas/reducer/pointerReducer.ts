@@ -298,7 +298,6 @@ const upByMode: ModeHandlerMap = {
 			session: {
 				...prev.session,
 				mode: { kind: "idle" },
-				selection: { kind: "none" },
 			},
 			effects: [],
 		}

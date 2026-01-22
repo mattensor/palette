@@ -508,7 +508,7 @@ describe("pointerReducer", () => {
 			expect(res.session.hover).toEqual(prev.session.hover)
 		})
 
-		it("draggingSelection: ends drag and clears selection for matching pointerId", () => {
+		it("draggingSelection: ends drag and maintains selection for matching pointerId", () => {
 			const shapeId = createShapeId("shape-1")
 			const prev = editorStateFactory({
 				session: {
@@ -534,7 +534,7 @@ describe("pointerReducer", () => {
 
 			expect(res.effects).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
-			expect(res.session.selection).toEqual({ kind: "none" })
+			expect(res.session.selection).toEqual({ kind: "shape", id: shapeId })
 		})
 
 		it("draggingSelection: noops if pointerId doesn't match", () => {
