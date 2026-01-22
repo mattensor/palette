@@ -1,20 +1,12 @@
-import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
 import type { EditorState, Rect, ShapeId } from "./types"
 
-function drawHoverOutline(
+function strokeRectOutline(
 	ctx: CanvasRenderingContext2D,
-	sessionState: EditorState["session"],
-	findShapeById: (id: ShapeId) => Rect | undefined,
-	{ color = "yellow", width = 2 } = {},
+	rect: Rect,
+	{ color, width }: { color: string; width: number },
 ) {
-	if (sessionState.hover.kind === "none") return
-
-	const rect = findShapeById(sessionState.hover.id)
-	if (!rect) return
-
 	const half = width / 2
-
 	ctx.save()
 	ctx.strokeStyle = color
 	ctx.lineWidth = width
@@ -26,42 +18,55 @@ function drawHoverOutline(
 	)
 	ctx.restore()
 }
-function drawRect(context: CanvasRenderingContext2D, rect: Rect) {
-	context.beginPath()
-	context.rect(rect.x, rect.y, rect.width, rect.height)
-	context.fill()
+
+function drawRect(ctx: CanvasRenderingContext2D, rect: Rect) {
+	ctx.beginPath()
+	ctx.rect(rect.x, rect.y, rect.width, rect.height)
+	ctx.fill()
 }
 
 function drawPreviewRect(
-	context: CanvasRenderingContext2D,
-	runtime: EditorState["session"],
+	ctx: CanvasRenderingContext2D,
+	session: EditorState["session"],
 ) {
-	const phase = runtime.mode
-	if (phase.kind !== "drawingRect") return
+	const m = session.mode
+	if (m.kind !== "drawingRect") return
 
-	const tempRect = normaliseRect(phase.origin, phase.current, createShapeId())
+	const tempRect = normaliseRect(m.origin, m.current, "__preview__" as ShapeId)
 
-	context.save()
-	context.setLineDash([6, 4])
-	context.strokeRect(tempRect.x, tempRect.y, tempRect.width, tempRect.height)
-	context.restore()
+	ctx.save()
+	ctx.setLineDash([6, 4])
+	ctx.strokeRect(tempRect.x, tempRect.y, tempRect.width, tempRect.height)
+	ctx.restore()
 }
 
 export function render(canvas: HTMLCanvasElement, state: EditorState) {
-	const context = canvas.getContext("2d")
-	if (context == null) return
+	const ctx = canvas.getContext("2d")
+	if (!ctx) return
 
-	context.clearRect(0, 0, canvas.width, canvas.height)
+	ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-	const doc = state.doc
+	const { doc, session } = state
 
-	for (const shapeId of doc.shapeOrder) {
-		const shape = doc.shapes.get(shapeId)
-		if (shape == null) continue
-
-		drawRect(context, shape)
+	for (const id of doc.shapeOrder) {
+		const rect = doc.shapes.get(id)
+		if (!rect) continue
+		drawRect(ctx, rect)
 	}
 
-	drawPreviewRect(context, state.session)
-	drawHoverOutline(context, state.session, (id: ShapeId) => doc.shapes.get(id))
+	drawPreviewRect(ctx, session)
+
+	const hoverId = session.hover.kind === "shape" ? session.hover.id : null
+	const selectedId =
+		session.selection.kind === "shape" ? session.selection.id : null
+
+	if (hoverId && hoverId !== selectedId) {
+		const rect = doc.shapes.get(hoverId)
+		if (rect) strokeRectOutline(ctx, rect, { color: "yellow", width: 2 })
+	}
+
+	if (selectedId) {
+		const rect = doc.shapes.get(selectedId)
+		if (rect) strokeRectOutline(ctx, rect, { color: "blue", width: 2 })
+	}
 }
