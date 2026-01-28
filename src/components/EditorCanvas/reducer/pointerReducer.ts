@@ -16,7 +16,7 @@ import type {
 
 type PointerResult = {
 	session: SessionState
-	debug: DebugState
+	debug: DebugState // feels like a smell need to clean this up
 	effects: DocEffect[]
 }
 
@@ -39,10 +39,6 @@ function incHitTests(debug: DebugState): DebugState {
 	}
 }
 
-/**
- * Hit-test wrapper that guarantees the metric is incremented exactly
- * when we hit-test (and nowhere else).
- */
 function hitTest(
 	prev: EditorState,
 	position: CanvasPoint,
@@ -131,17 +127,6 @@ function handleByMode(
 		| undefined
 
 	return handler ? handler(prev, event) : noop(prev)
-}
-
-function moveSelectionEffect(
-	id: ShapeId,
-	startRect: Rect,
-	startPointer: CanvasPoint,
-	currentPointer: CanvasPoint,
-): DocEffect {
-	const d = delta(startPointer, currentPointer)
-	const pos = translateRect(startRect, d)
-	return { type: "SET_SHAPE_POSITION", id, x: pos.x, y: pos.y }
 }
 
 function toIdle(prev: EditorState): PointerResult {
@@ -263,13 +248,6 @@ const moveByMode: ModeHandlerMap = {
 		}
 
 		if (intent.kind === "dragSelection") {
-			const effect = moveSelectionEffect(
-				intent.shapeId,
-				intent.startRect,
-				intent.startPointer,
-				event.position,
-			)
-
 			return {
 				session: {
 					...prev.session,
@@ -278,11 +256,12 @@ const moveByMode: ModeHandlerMap = {
 						shapeId: intent.shapeId,
 						pointerId,
 						startPointer: intent.startPointer,
+						currentPointer: event.position,
 						startRect: intent.startRect,
 					},
 				},
 				debug: prev.debug,
-				effects: [effect],
+				effects: [],
 			}
 		}
 
@@ -294,16 +273,15 @@ const moveByMode: ModeHandlerMap = {
 		if (!samePointer(m, event)) return noop(prev)
 
 		return {
-			session: prev.session,
+			session: {
+				...prev.session,
+				mode: {
+					...prev.session.mode,
+					currentPointer: event.position,
+				},
+			},
 			debug: prev.debug,
-			effects: [
-				moveSelectionEffect(
-					m.shapeId,
-					m.startRect,
-					m.startPointer,
-					event.position,
-				),
-			],
+			effects: [],
 		}
 	},
 
@@ -337,13 +315,22 @@ const upByMode: ModeHandlerMap = {
 		const m = prev.session.mode
 		if (!samePointer(m, event)) return noop(prev)
 
+		const d = delta(m.startPointer, event.position)
+		const pos = translateRect(m.startRect, d)
+		const effect: DocEffect = {
+			type: "SET_SHAPE_POSITION",
+			id: m.shapeId,
+			x: pos.x,
+			y: pos.y,
+		}
+
 		return {
 			session: {
 				...prev.session,
 				mode: { kind: "idle" },
 			},
 			debug: prev.debug,
-			effects: [],
+			effects: [effect],
 		}
 	},
 

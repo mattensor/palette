@@ -1,5 +1,5 @@
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
-import type { EditorState, Rect, ShapeId } from "./types"
+import type { DocumentState, EditorState, Mode, Rect, ShapeId } from "./types"
 
 function strokeRectOutline(
 	ctx: CanvasRenderingContext2D,
@@ -25,19 +25,37 @@ function drawRect(ctx: CanvasRenderingContext2D, rect: Rect) {
 	ctx.fill()
 }
 
-function drawPreviewRect(
-	ctx: CanvasRenderingContext2D,
-	session: EditorState["session"],
-) {
-	const m = session.mode
-	if (m.kind !== "drawingRect") return
+function deriveRenderableDoc(doc: DocumentState, mode: Mode): DocumentState {
+	let shapes = doc.shapes
 
-	const tempRect = normaliseRect(m.origin, m.current, "__preview__" as ShapeId)
+	if (mode.kind === "draggingSelection") {
+		const dx = mode.currentPointer.x - mode.startPointer.x
+		const dy = mode.currentPointer.y - mode.startPointer.y
 
-	ctx.save()
-	ctx.setLineDash([6, 4])
-	ctx.strokeRect(tempRect.x, tempRect.y, tempRect.width, tempRect.height)
-	ctx.restore()
+		const moved: Rect = {
+			...mode.startRect,
+			x: mode.startRect.x + dx,
+			y: mode.startRect.y + dy,
+		}
+
+		shapes = new Map([...shapes, [mode.shapeId, moved]])
+		return { ...doc, shapes }
+	}
+
+	if (mode.kind === "drawingRect") {
+		const previewId = "__preview__" as ShapeId
+		const preview = normaliseRect(mode.origin, mode.current, previewId)
+
+		shapes = new Map([...shapes, [previewId, preview]])
+
+		const shapeOrder = doc.shapeOrder.includes(previewId)
+			? doc.shapeOrder
+			: [...doc.shapeOrder, previewId]
+
+		return { ...doc, shapes, shapeOrder }
+	}
+
+	return doc
 }
 
 export function render(canvas: HTMLCanvasElement, state: EditorState) {
@@ -47,26 +65,37 @@ export function render(canvas: HTMLCanvasElement, state: EditorState) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 
 	const { doc, session } = state
+	const renderDoc = deriveRenderableDoc(doc, session.mode)
 
-	for (const id of doc.shapeOrder) {
-		const rect = doc.shapes.get(id)
+	for (const id of renderDoc.shapeOrder) {
+		const rect = renderDoc.shapes.get(id)
 		if (!rect) continue
+
+		if (
+			id === ("__preview__" as ShapeId) &&
+			session.mode.kind === "drawingRect"
+		) {
+			ctx.save()
+			ctx.setLineDash([6, 4])
+			ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
+			ctx.restore()
+			continue
+		}
+
 		drawRect(ctx, rect)
 	}
-
-	drawPreviewRect(ctx, session)
 
 	const hoverId = session.hover.kind === "shape" ? session.hover.id : null
 	const selectedId =
 		session.selection.kind === "shape" ? session.selection.id : null
 
 	if (hoverId && hoverId !== selectedId) {
-		const rect = doc.shapes.get(hoverId)
+		const rect = renderDoc.shapes.get(hoverId)
 		if (rect) strokeRectOutline(ctx, rect, { color: "yellow", width: 2 })
 	}
 
 	if (selectedId) {
-		const rect = doc.shapes.get(selectedId)
+		const rect = renderDoc.shapes.get(selectedId)
 		if (rect) strokeRectOutline(ctx, rect, { color: "blue", width: 2 })
 	}
 }

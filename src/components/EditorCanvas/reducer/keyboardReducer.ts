@@ -44,6 +44,10 @@ function KEY_DOWN(
 		}
 	}
 
+	if (event.key === "z") {
+		console.log("pressed z", event.modifiers)
+	}
+
 	return noop(prev)
 }
 

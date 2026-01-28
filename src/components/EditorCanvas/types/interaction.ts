@@ -1,6 +1,13 @@
 import type { CanvasPoint, PointerId, Rect, ShapeId } from "./domain"
 
-export type Key = "Delete" | "Backspace" | "Escape"
+export type Key = "Delete" | "Backspace" | "Escape" | "z"
+
+export type Modifiers = {
+	meta: boolean
+	shift: boolean
+	alt: boolean
+	ctrl: boolean
+}
 
 export type PointerEventType =
 	| "POINTER_DOWN"
@@ -8,17 +15,18 @@ export type PointerEventType =
 	| "POINTER_UP"
 	| "POINTER_CANCEL"
 
-export type KeyboardEventType = "KEY_DOWN"
-
 export type PointerEditorEvent = {
 	type: PointerEventType
 	pointerId: PointerId
 	position: CanvasPoint
 }
 
+export type KeyboardEventType = "KEY_DOWN"
+
 export type KeyboardEditorEvent = {
 	type: KeyboardEventType
 	key: Key
+	modifiers: Modifiers
 }
 
 export type EditorEvent = PointerEditorEvent | KeyboardEditorEvent
@@ -52,6 +60,7 @@ export type Mode =
 			pointerId: PointerId
 			shapeId: ShapeId
 			startPointer: CanvasPoint
+			currentPointer: CanvasPoint
 			startRect: Rect
 	  }
 

@@ -2,11 +2,9 @@ import type { KeyboardEvent, PointerEvent } from "react"
 import { useEffect, useRef, useState } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
 import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
+import { normaliseKeyboardEvent } from "@/components/EditorCanvas/helpers/normaliseKeyboardEvent"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
-import {
-	normaliseKeyboardEvent,
-	normalisePointerEvent,
-} from "./helpers/normalisePointerEvent"
+import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import { createInitialState, reducer } from "./reducer"
 import { render } from "./render"
 import styles from "./styles.module.css"
@@ -141,13 +139,11 @@ export function EditorCanvas() {
 	}
 
 	function handleKeyDown(e: KeyboardEvent<HTMLCanvasElement>) {
-		if (e.key === "Delete" || e.key === "Backspace") {
-			const canvas = canvasRef.current
-			if (canvas == null) return
+		const canvas = canvasRef.current
+		if (canvas == null) return
 
-			const editorEvent = normaliseKeyboardEvent(e)
-			if (editorEvent) enqueueEvent(editorEvent)
-		}
+		const editorEvent = normaliseKeyboardEvent(e)
+		if (editorEvent) enqueueEvent(editorEvent)
 	}
 
 	return (
