@@ -19,10 +19,10 @@ This project is about **how an editor works**, not how it looks.
 
 I’m using it to explore:
 
-- pointer input normalization
-- deterministic state updates
-- frame-aware rendering
-- clear separation between DOM, logic, and rendering
+- pointer input normalization (browser → domain events)
+- deterministic state updates (event → reducer → next state)
+- frame-aware rendering via requestAnimationFrame
+- clear separation between runtime interaction state and document state
 
 It is **not**:
 
@@ -34,41 +34,24 @@ It is **not**:
 
 ## Architecture overview
 
-The editor is split into a few clear layers:
+The editor is split into a few layers:
 
-```
 [ App / Layout ]
-  AppShell, Sidebar, Editor
+AppShell, Sidebar, Editor
 
-[ DOM Adapter ]
-  CanvasHost
+[ Host / Adapter ]
+CanvasHost (event normalization + rAF scheduling)
 
 [ Editor Core (headless) ]
-  EditorState, Reducer, Renderer
-```
+EditorState, Reducer, Effects, DocReducer, Renderer
+
 
 Key ideas:
 
 - The editor core does not depend on React or the DOM
-- CanvasHost adapts browser input and scheduling to the editor
+- CanvasHost adapts browser input + scheduling to the editor
 - Rendering is a pure read of editor state
-- Layout decisions don’t leak into editor logic
-
----
-
-## Component hierarchy
-
-```
-Root (#root)
-└── App
-    └── AppShell
-        ├── Sidebar
-        └── Editor
-            └── CanvasHost
-                └── CanvasSurface
-```
-
-Each component has a single responsibility and minimal knowledge of the others.
+- Document changes are applied via explicit DocEffects
 
 ---
 
@@ -76,22 +59,20 @@ Each component has a single responsibility and minimal knowledge of the others.
 
 Right now, the editor supports:
 
-- pointer-driven drawing
-- normalized pointer events
-- a single source of truth for editor state
-- rendering batched with \`requestAnimationFrame\`
-- a stable, full-viewport canvas layout
+- normalized pointer + keyboard events (`EditorEvent`)
+- event batching and rendering via `requestAnimationFrame`
+- shape drawing (rectangle preview while drawing, commit on pointer up)
+- hit-testing + hover state
+- selection (single shape)
+- dragging selected shapes (anchored drag model)
+- deleting the selected shape via keyboard
 
-Things that are intentionally **not** implemented yet:
+In progress / next:
 
-- selection
-- undo / redo
-- zoom / pan
+- undo / redo (patch-based history)
+- coalescing drag into a single committed history entry
 - persistence
-- performance optimizations
-- tooling UI
-
-Those will be added later, once the foundations are solid.
+- performance profiling + batching refinements
 
 ---
 
@@ -102,8 +83,8 @@ Those will be added later, once the foundations are solid.
 - Vite
 - Canvas 2D
 
-No state libraries.  
-No rendering frameworks.  
+No state libraries.
+No rendering frameworks.
 No styling systems.
 
 ---
@@ -115,28 +96,11 @@ npm install
 npm run dev
 ```
 
----
-
-## How I’m approaching this
-
-A few rules I’m following while building this:
-
-- Build the simplest thing that’s correct
-- Keep boundaries explicit
-- Prefer boring code over clever code
-- Don’t optimize until there’s something to optimize
-- Treat architecture decisions as part of the output
-
-This repo is meant to show **how I think about frontend systems**, not just what I can ship quickly.
-
----
-
 ## Status
 
-This project is actively in progress and intentionally incomplete.
+Actively in progress and intentionally incomplete.
 
 Each phase focuses on one concern at a time:
-
 - correctness first
 - structure second
 - polish last
