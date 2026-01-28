@@ -1,6 +1,6 @@
-import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
 import type {
 	DebugState,
+	DocEffect,
 	EditorState,
 	KeyboardEditorEvent,
 	KeyboardEventType,

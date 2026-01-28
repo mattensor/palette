@@ -1,22 +1,16 @@
 import { createShapeId } from "@/components/EditorCanvas/helpers/createShapeId"
 import { normaliseRect } from "@/components/EditorCanvas/helpers/normaliseRect"
+
 import type {
 	DocEffect,
-	DocEffectByType,
-	DocEffectType,
-} from "@/components/EditorCanvas/reducer/types"
-import type { DocumentState } from "@/components/EditorCanvas/types"
-
-type HandlerMap = {
-	[K in DocEffectType]: (
-		prev: DocumentState,
-		effect: DocEffectByType[K],
-	) => DocumentState
-}
+	DocEffectHandlerMap,
+	DocumentState,
+	ShapeId,
+} from "@/components/EditorCanvas/types"
 
 function COMMIT_DRAW_RECT(
 	prev: DocumentState,
-	effect: DocEffectByType["COMMIT_DRAW_RECT"],
+	effect: Extract<DocEffect, { type: "COMMIT_DRAW_RECT" }>,
 ): DocumentState {
 	const id = createShapeId()
 	const rect = normaliseRect(effect.origin, effect.current, id)
@@ -33,7 +27,7 @@ function COMMIT_DRAW_RECT(
 
 function SET_SHAPE_POSITION(
 	prev: DocumentState,
-	effect: DocEffectByType["SET_SHAPE_POSITION"],
+	effect: Extract<DocEffect, { type: "SET_SHAPE_POSITION" }>,
 ): DocumentState {
 	const shape = prev.shapes.get(effect.id)
 	if (shape == null) return prev
@@ -55,12 +49,14 @@ function SET_SHAPE_POSITION(
 
 function REMOVE_SHAPE(
 	prev: DocumentState,
-	effect: DocEffectByType["REMOVE_SHAPE"],
+	effect: Extract<DocEffect, { type: "REMOVE_SHAPE" }>,
 ): DocumentState {
 	const shapes = new Map(prev.shapes)
 	shapes.delete(effect.id)
 
-	const shapeOrder = prev.shapeOrder.filter((shapeId) => shapeId !== effect.id)
+	const shapeOrder = prev.shapeOrder.filter(
+		(shapeId: ShapeId) => shapeId !== effect.id,
+	)
 
 	return {
 		...prev,
@@ -69,7 +65,7 @@ function REMOVE_SHAPE(
 	}
 }
 
-const docEffectHandlers: HandlerMap = {
+const docEffectHandlers: DocEffectHandlerMap = {
 	COMMIT_DRAW_RECT,
 	SET_SHAPE_POSITION,
 	REMOVE_SHAPE,

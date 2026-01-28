@@ -1,5 +1,4 @@
-import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
-import type { EditorState } from "@/components/EditorCanvas/types"
+import type { DocEffect, EditorState } from "@/components/EditorCanvas/types"
 
 export type DevLogName =
 	| "session/mode_changed"
@@ -50,14 +49,6 @@ function sameHover(
 	return false
 }
 
-/**
- * Day 2 logging rules:
- * - log session/mode_changed when mode.kind changes
- * - log session/hover_changed when hover target changes
- * - log doc/rect_added when draw intent commits
- *
- * Intentionally logs intent, not geometry.
- */
 export function withDevLog(args: {
 	prev: EditorState
 	next: EditorState

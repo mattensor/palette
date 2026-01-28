@@ -9,18 +9,18 @@ import { pointerReducer } from "@/components/EditorCanvas/reducer/pointerReducer
 
 import type {
 	CanvasPoint,
-	EditorEvent,
+	PointerEditorEvent,
 	PointerId,
 	Rect,
 	ShapeId,
 } from "@/components/EditorCanvas/types"
-import { editorEventFactory } from "@/factories/editorEventFactory"
 import { editorStateFactory } from "@/factories/editorStateFactory"
+import { pointerEventFactory } from "@/factories/pointerEventFactory"
 import { rectFactory } from "@/factories/rectFactory"
 
 const hitTestMock = vi.mocked(hitTestTopmostShape)
 
-const createPointerId = (s: string) => s as PointerId
+const createPointerId = (s: string) => s as unknown as PointerId
 const createShapeId = (s: string) => s as ShapeId
 const createPoint = (x: number, y: number): CanvasPoint => ({ x, y })
 
@@ -44,7 +44,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
 				pointerId: createPointerId("p1"),
 				position: createPoint(10, 10),
@@ -67,7 +67,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
 				pointerId: createPointerId("p1"),
 				position: createPoint(10, 10),
@@ -104,7 +104,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
 				pointerId: createPointerId("p1"),
 				position: createPoint(10, 20),
@@ -129,7 +129,7 @@ describe("pointerReducer", () => {
 			hitTestMock.mockReturnValue(createShapeId("shape-1"))
 
 			const prev = editorStateFactory()
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(5, 5),
@@ -156,7 +156,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(123, 456),
@@ -178,7 +178,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(9, 9),
@@ -194,7 +194,7 @@ describe("pointerReducer", () => {
 			hitTestMock.mockReturnValue(null)
 
 			const prev = editorStateFactory()
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(1, 2),
@@ -220,7 +220,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p2"),
 				position: createPoint(10, 0),
@@ -235,7 +235,7 @@ describe("pointerReducer", () => {
 			hitTestMock.mockReturnValue(null)
 
 			const prev = editorStateFactory()
-			const down = editorEventFactory({
+			const down = pointerEventFactory({
 				type: "POINTER_DOWN",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 0),
@@ -243,7 +243,7 @@ describe("pointerReducer", () => {
 			const armed = pointerReducer(prev, down).session
 
 			// still within threshold (<= 3px delta)
-			const moveSmall = editorEventFactory({
+			const moveSmall = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(3, 0),
@@ -253,7 +253,7 @@ describe("pointerReducer", () => {
 			expect(resSmall.effects).toEqual([])
 
 			// exceeds threshold
-			const moveBig = editorEventFactory({
+			const moveBig = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(4, 0),
@@ -280,7 +280,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const down = editorEventFactory({
+			const down = pointerEventFactory({
 				type: "POINTER_DOWN",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 0),
@@ -290,7 +290,7 @@ describe("pointerReducer", () => {
 			expect(armedState.session.mode.kind).toBe("armed")
 
 			// within threshold: noop
-			const moveSmall = editorEventFactory({
+			const moveSmall = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 3),
@@ -303,7 +303,7 @@ describe("pointerReducer", () => {
 			expect(resSmall.effects).toEqual([])
 
 			// exceeds threshold: starts dragging and emits effect
-			const moveBig = editorEventFactory({
+			const moveBig = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 4),
@@ -346,7 +346,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(15, 5),
@@ -379,7 +379,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p1"),
 				position: createPoint(9, 9),
@@ -411,7 +411,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_MOVE",
 				pointerId: createPointerId("p2"),
 				position: createPoint(9, 9),
@@ -438,7 +438,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 0),
@@ -463,7 +463,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p2"),
 				position: createPoint(0, 0),
@@ -488,7 +488,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p1"),
 				position: createPoint(5, 5),
@@ -524,7 +524,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p1"),
 				position: createPoint(10, 10),
@@ -551,7 +551,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p2"),
 				position: createPoint(0, 0),
@@ -564,7 +564,7 @@ describe("pointerReducer", () => {
 
 		it("noops if not drawingRect/armed/draggingSelection", () => {
 			const prev = editorStateFactory()
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p1"),
 				position: createPoint(0, 0),
@@ -588,7 +588,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p2"),
 				position: createPoint(5, 5),
@@ -615,7 +615,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_CANCEL",
 				pointerId: createPointerId("p1"),
 				position: createPoint(999, 999),
@@ -643,7 +643,7 @@ describe("pointerReducer", () => {
 				},
 			})
 
-			const event = editorEventFactory({
+			const event = pointerEventFactory({
 				type: "POINTER_CANCEL",
 				pointerId: createPointerId("p2"),
 				position: createPoint(999, 999),
@@ -658,7 +658,7 @@ describe("pointerReducer", () => {
 	describe("error case: unknown event type", () => {
 		it("noops if handler missing", () => {
 			const prev = editorStateFactory()
-			const event = { type: "SOMETHING_ELSE" } as unknown as EditorEvent
+			const event = { type: "SOMETHING_ELSE" } as unknown as PointerEditorEvent
 
 			const res = pointerReducer(prev, event)
 			expect(res.session).toBe(prev.session)

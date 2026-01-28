@@ -1,8 +1,9 @@
 import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
-import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
+
 import type {
 	CanvasPoint,
 	DebugState,
+	DocEffect,
 	DocumentState,
 	EditorState,
 	Mode,

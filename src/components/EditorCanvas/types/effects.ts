@@ -1,8 +1,4 @@
-import type {
-	CanvasPoint,
-	DocumentState,
-	ShapeId,
-} from "@/components/EditorCanvas/types"
+import type { CanvasPoint, DocumentState, ShapeId } from "./domain"
 
 export type DocEffect =
 	| {
@@ -23,13 +19,9 @@ export type DocEffect =
 
 export type DocEffectType = DocEffect["type"]
 
-export type DocEffectByType = {
-	[K in DocEffectType]: Extract<DocEffect, { type: K }>
-}
-
 export type DocEffectHandlerMap = {
-	[K in DocEffectType]?: (
+	[K in DocEffectType]: (
 		prev: DocumentState,
-		effect: DocEffectByType[K],
+		effect: Extract<DocEffect, { type: K }>,
 	) => DocumentState
 }

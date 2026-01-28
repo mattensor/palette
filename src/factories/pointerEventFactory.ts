@@ -1,9 +1,9 @@
 import { createPointerId } from "@/components/EditorCanvas/helpers/createPointerId"
-import type { EditorEvent } from "@/components/EditorCanvas/types"
+import type { PointerEditorEvent } from "@/components/EditorCanvas/types"
 
-export function editorEventFactory(
-	overrides: Partial<EditorEvent> = {},
-): EditorEvent {
+export function pointerEventFactory(
+	overrides: Partial<PointerEditorEvent> = {},
+): PointerEditorEvent {
 	return {
 		type: "POINTER_DOWN",
 		pointerId: createPointerId(123),
