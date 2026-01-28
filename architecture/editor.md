@@ -50,6 +50,38 @@ If rendering occurred immediately for every event, this would result in:
 The browser typically renders at around 60 frames per second.  
 By batching editor events and processing them once per animation frame, we work with the browser and produce smoother interactions.
 
-## Pointer Phase
+## Runtime State vs Document State
 
-## Runtime vs Document
+Editor state is split into two conceptual categories:
+- Document state
+  Persistent, user-authored data such as shapes and layout.
+- Runtime state
+  Transient interaction state such as pointer position, hover, active mode, or drag-in-progress data.
+
+Runtime state exists to support interaction and rendering but does not represent durable user intent.
+
+## Interaction Phases
+
+Pointer interactions move through explicit phases (e.g. idle, armed, dragging).
+
+These phases determine:
+- how incoming events are interpreted
+- which state transitions are allowed
+- when document changes are committed
+
+Modeling interactions as phased state transitions helps prevent invalid transitions and keeps interaction logic explicit.
+
+## Determinism & Replay
+
+Editor state is derived entirely from editor events.
+
+This allows:
+- deterministic state transitions
+- replaying event sequences for debugging
+- testing editor behavior without relying on browser APIs
+
+## Summary
+
+The editor architecture treats input as events, processes those events in frame-based batches, derives deterministic state, and renders from that state.
+
+By separating runtime interaction state from document state and modeling interactions explicitly, the editor remains predictable, performant, and extensible.
