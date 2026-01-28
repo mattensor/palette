@@ -15,13 +15,14 @@ export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 			? keyboardReducer(prev, event as KeyboardEditorEvent)
 			: pointerReducer(prev, event as PointerEditorEvent)
 
-	const { session, effects } = result
+	const { session, debug, effects } = result
 	const doc = effects.reduce(docReducer, prev.doc)
 
 	let next: EditorState = {
 		...prev,
 		doc,
 		session,
+		debug,
 	}
 
 	if (doc !== prev.doc) {

@@ -1,19 +1,24 @@
 import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
 import type {
+	DebugState,
 	EditorState,
 	KeyboardEditorEvent,
 	KeyboardEventType,
 	SessionState,
 } from "@/components/EditorCanvas/types"
 
-type PointerResult = { session: SessionState; effects: DocEffect[] }
+type PointerResult = {
+	session: SessionState
+	debug: DebugState
+	effects: DocEffect[]
+}
 type KeyboardEventHandler = (
 	prev: EditorState,
 	event: KeyboardEditorEvent,
 ) => PointerResult
 
 function noop(prev: EditorState): PointerResult {
-	return { session: prev.session, effects: [] }
+	return { session: prev.session, debug: prev.debug, effects: [] }
 }
 
 function KEY_DOWN(
@@ -34,6 +39,7 @@ function KEY_DOWN(
 				...prev.session,
 				selection: { kind: "none" },
 			},
+			debug: prev.debug,
 			effects: [effect],
 		}
 	}

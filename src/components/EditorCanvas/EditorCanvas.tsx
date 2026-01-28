@@ -69,6 +69,8 @@ export function EditorCanvas() {
 	}, [])
 
 	function processFrame() {
+		editorStateRef.current.debug.metrics.hitTests = 0
+
 		const eventsToProcess = eventQueueRef.current
 		eventQueueRef.current = []
 
@@ -86,6 +88,8 @@ export function EditorCanvas() {
 
 		// mutate in place to avoid updating editor state every frame
 		editorStateRef.current.debug.metrics.lastRenderMs = after - before
+		editorStateRef.current.debug.metrics.eventsProcessed =
+			eventsToProcess.length
 	}
 
 	function scheduleFrame() {

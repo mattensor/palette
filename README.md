@@ -37,7 +37,7 @@ It is **not**:
 The editor is split into a few layers:
 
 [ App / Layout ]
-AppShell, Sidebar, Editor
+AppShell, Editor
 
 [ Host / Adapter ]
 CanvasHost (event normalization + rAF scheduling)

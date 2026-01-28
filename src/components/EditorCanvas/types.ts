@@ -48,6 +48,8 @@ export type KeyboardEventType = Extract<EditorEventType, "KEY_DOWN">
 export type Metrics = {
 	lastRenderMs: number | null
 	shapeCount: number
+	eventsProcessed: number
+	hitTests: number
 }
 
 export type DevLogEvent = {

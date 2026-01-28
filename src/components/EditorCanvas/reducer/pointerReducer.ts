@@ -2,6 +2,7 @@ import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
 import type { DocEffect } from "@/components/EditorCanvas/reducer/types"
 import type {
 	CanvasPoint,
+	DebugState,
 	DocumentState,
 	EditorState,
 	Mode,
@@ -12,24 +13,56 @@ import type {
 	ShapeId,
 } from "@/components/EditorCanvas/types"
 
-type PointerResult = { session: SessionState; effects: DocEffect[] }
+type PointerResult = {
+	session: SessionState
+	debug: DebugState
+	effects: DocEffect[]
+}
+
 type PointerEventHandler = (
 	prev: EditorState,
 	event: PointerEditorEvent,
 ) => PointerResult
 
 function noop(prev: EditorState): PointerResult {
-	return { session: prev.session, effects: [] }
+	return { session: prev.session, debug: prev.debug, effects: [] }
+}
+
+function incHitTests(debug: DebugState): DebugState {
+	return {
+		...debug,
+		metrics: {
+			...debug.metrics,
+			hitTests: debug.metrics.hitTests + 1,
+		},
+	}
+}
+
+/**
+ * Hit-test wrapper that guarantees the metric is incremented exactly
+ * when we hit-test (and nowhere else).
+ */
+function hitTest(
+	prev: EditorState,
+	position: CanvasPoint,
+): { hitShapeId: ShapeId | null; debug: DebugState } {
+	const hitShapeId = hitTestTopmostShape(prev.doc, position)
+	return { hitShapeId, debug: incHitTests(prev.debug) }
 }
 
 function updateHover(
 	prev: EditorState,
 	hitShapeId: ShapeId | null,
+	debug: DebugState,
 ): PointerResult {
 	if (hitShapeId == null) {
-		if (prev.session.hover.kind === "none") return noop(prev)
+		if (prev.session.hover.kind === "none") {
+			// still return updated debug to preserve metric increment
+			return { ...noop(prev), debug }
+		}
 		return {
 			session: { ...prev.session, hover: { kind: "none" } },
+			debug,
 			effects: [],
 		}
 	}
@@ -38,11 +71,13 @@ function updateHover(
 		prev.session.hover.kind === "shape" &&
 		prev.session.hover.id === hitShapeId
 	) {
-		return noop(prev)
+		// still return updated debug to preserve metric increment
+		return { ...noop(prev), debug }
 	}
 
 	return {
 		session: { ...prev.session, hover: { kind: "shape", id: hitShapeId } },
+		debug,
 		effects: [],
 	}
 }
@@ -76,6 +111,7 @@ type ModeOf<K extends ModeKind> = Extract<Mode, { kind: K }>
 type StateWithMode<K extends ModeKind> = EditorState & {
 	session: SessionState & { mode: ModeOf<K> }
 }
+
 type ModeHandlerMap = {
 	[K in ModeKind]?: (
 		prev: StateWithMode<K>,
@@ -108,7 +144,11 @@ function moveSelectionEffect(
 }
 
 function toIdle(prev: EditorState): PointerResult {
-	return { session: { ...prev.session, mode: { kind: "idle" } }, effects: [] }
+	return {
+		session: { ...prev.session, mode: { kind: "idle" } },
+		debug: prev.debug,
+		effects: [],
+	}
 }
 
 function cancelToIdle(prev: EditorState): PointerResult {
@@ -118,13 +158,18 @@ function cancelToIdle(prev: EditorState): PointerResult {
 			mode: { kind: "idle" },
 			hover: { kind: "none" },
 		},
+		debug: prev.debug,
 		effects: [],
 	}
 }
 
+/**
+ * POINTER_DOWN
+ * - Hit-test exactly once to resolve intent.
+ */
 const downByMode: ModeHandlerMap = {
 	idle(prev, event) {
-		const hitShapeId = hitTestTopmostShape(prev.doc, event.position)
+		const { hitShapeId, debug } = hitTest(prev, event.position)
 
 		// Clicked empty space: arm for drawing.
 		if (hitShapeId == null) {
@@ -140,13 +185,17 @@ const downByMode: ModeHandlerMap = {
 					hover: { kind: "none" },
 					selection: { kind: "none" },
 				},
+				debug,
 				effects: [],
 			}
 		}
 
 		// Clicked shape: arm for dragging (only if we can resolve rect).
 		const rect = getRect(prev.doc, hitShapeId)
-		if (!rect) return noop(prev)
+		if (!rect) {
+			// still preserve debug increment
+			return { ...noop(prev), debug }
+		}
 
 		return {
 			session: {
@@ -165,6 +214,7 @@ const downByMode: ModeHandlerMap = {
 				hover: { kind: "none" },
 				selection: { kind: "shape", id: hitShapeId },
 			},
+			debug,
 			effects: [],
 		}
 	},
@@ -177,9 +227,15 @@ function POINTER_DOWN(
 	return handleByMode(downByMode, prev, event)
 }
 
+/**
+ * POINTER_MOVE
+ * - While idle: hit-test to update hover.
+ * - While armed/dragging: no hit-test needed (we already resolved intent on down).
+ */
 const moveByMode: ModeHandlerMap = {
 	idle(prev, event) {
-		return updateHover(prev, hitTestTopmostShape(prev.doc, event.position))
+		const { hitShapeId, debug } = hitTest(prev, event.position)
+		return updateHover(prev, hitShapeId, debug)
 	},
 
 	armed(prev, event) {
@@ -195,11 +251,12 @@ const moveByMode: ModeHandlerMap = {
 					...prev.session,
 					mode: {
 						kind: "drawingRect",
-						pointerId, // use armed pointerId
+						pointerId,
 						origin,
 						current: event.position,
 					},
 				},
+				debug: prev.debug,
 				effects: [],
 			}
 		}
@@ -218,11 +275,12 @@ const moveByMode: ModeHandlerMap = {
 					mode: {
 						kind: "draggingSelection",
 						shapeId: intent.shapeId,
-						pointerId, // use armed pointerId
+						pointerId,
 						startPointer: intent.startPointer,
 						startRect: intent.startRect,
 					},
 				},
+				debug: prev.debug,
 				effects: [effect],
 			}
 		}
@@ -235,7 +293,8 @@ const moveByMode: ModeHandlerMap = {
 		if (!samePointer(m, event)) return noop(prev)
 
 		return {
-			session: prev.session, // unchanged during drag
+			session: prev.session,
+			debug: prev.debug,
 			effects: [
 				moveSelectionEffect(
 					m.shapeId,
@@ -253,6 +312,7 @@ const moveByMode: ModeHandlerMap = {
 
 		return {
 			session: { ...prev.session, mode: { ...m, current: event.position } },
+			debug: prev.debug,
 			effects: [],
 		}
 	},
@@ -281,6 +341,7 @@ const upByMode: ModeHandlerMap = {
 				...prev.session,
 				mode: { kind: "idle" },
 			},
+			debug: prev.debug,
 			effects: [],
 		}
 	},
@@ -297,6 +358,7 @@ const upByMode: ModeHandlerMap = {
 
 		return {
 			session: { ...prev.session, mode: { kind: "idle" } },
+			debug: prev.debug,
 			effects: [effect],
 		}
 	},

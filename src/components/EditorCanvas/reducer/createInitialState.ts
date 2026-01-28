@@ -15,6 +15,8 @@ export function createInitialState(): EditorState {
 			metrics: {
 				lastRenderMs: null,
 				shapeCount: 0,
+				eventsProcessed: 0,
+				hitTests: 0,
 			},
 			devLog: [],
 		},
