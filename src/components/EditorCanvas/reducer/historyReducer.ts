@@ -12,7 +12,11 @@ export function historyReducer(
 			return {
 				...prev,
 				doc: docReducer(prev.doc, patch),
-				history: prev.history,
+				history: {
+					...prev.history,
+					past: [...prev.history.past, patch],
+					future: [], // invalidate past future history
+				},
 			}
 		}
 		case "UNDO":
