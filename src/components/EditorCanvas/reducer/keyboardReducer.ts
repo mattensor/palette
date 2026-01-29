@@ -4,59 +4,52 @@ import type {
 	DocAction,
 	EditorState,
 	KeyboardEditorEvent,
-	KeyboardEventType,
 	SessionState,
 } from "@/components/EditorCanvas/types"
 
-type PointerResult = {
+export type KeyboardResult = {
 	session: SessionState
 	debug: DebugState
 	actions: DocAction[]
 }
-type KeyboardEventHandler = (
-	prev: EditorState,
-	event: KeyboardEditorEvent,
-) => PointerResult
 
-function noop(prev: EditorState): PointerResult {
+function noop(prev: EditorState): KeyboardResult {
 	return { session: prev.session, debug: prev.debug, actions: [] }
 }
 
-function KEY_DOWN(
-	prev: EditorState,
-	event: KeyboardEditorEvent,
-): PointerResult {
-	if (prev.session.selection.kind === "none") return noop(prev)
-
-	// later refactor this to a map structure
-	if (event.key === "Backspace" || event.key === "Delete") {
-		const action = createRemoveRect(prev.doc, prev.session.selection.id)
-
-		return {
-			session: {
-				...prev.session,
-				selection: { kind: "none" },
-			},
-			debug: prev.debug,
-			actions: action ? [action] : [],
-		}
-	}
-
-	if (event.key === "z") {
-		console.log("pressed z", event.modifiers)
-	}
-
-	return noop(prev)
+function withClearedSelection(prev: EditorState): SessionState {
+	return { ...prev.session, selection: { kind: "none" } }
 }
 
-const keyboardEventHandlers: Record<KeyboardEventType, KeyboardEventHandler> = {
-	KEY_DOWN,
+function deleteSelection(prev: EditorState): KeyboardResult {
+	if (prev.session.selection.kind === "none") return noop(prev)
+
+	const action = createRemoveRect(prev.doc, prev.session.selection.id)
+
+	return {
+		session: withClearedSelection(prev),
+		debug: prev.debug,
+		actions: action ? [action] : [],
+	}
 }
 
 export function keyboardReducer(
 	prev: EditorState,
 	event: KeyboardEditorEvent,
-): PointerResult {
-	const handler = keyboardEventHandlers[event.type]
-	return handler ? handler(prev, event) : noop(prev)
+): KeyboardResult {
+	switch (event.type) {
+		case "KEY_DOWN":
+			break
+		default:
+			return noop(prev)
+	}
+
+	switch (event.key) {
+		case "Backspace":
+		case "Delete":
+			return deleteSelection(prev)
+
+		default:
+			return noop(prev)
+	}
 }

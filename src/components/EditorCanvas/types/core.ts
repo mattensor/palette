@@ -1,4 +1,4 @@
-import type { DocPatch } from "@/components/EditorCanvas/types/effects"
+import type { DocPatch } from "@/components/EditorCanvas/types/actions"
 import type { DocumentState } from "./domain"
 import type { SessionState } from "./interaction"
 

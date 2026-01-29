@@ -10,7 +10,6 @@ import type {
 	EditorState,
 	Mode,
 	PointerEditorEvent,
-	PointerEventType,
 	Rect,
 	SessionState,
 	ShapeId,
@@ -18,14 +17,16 @@ import type {
 
 type PointerResult = {
 	session: SessionState
-	debug: DebugState // feels like a smell need to clean this up
+	debug: DebugState
 	actions: DocAction[]
 }
 
-type PointerEventHandler = (
+type ModeKind = Mode["kind"]
+type ModeHandler = (
 	prev: EditorState,
 	event: PointerEditorEvent,
 ) => PointerResult
+type ModeHandlerMap = Partial<Record<ModeKind, ModeHandler>>
 
 function noop(prev: EditorState): PointerResult {
 	return { session: prev.session, debug: prev.debug, actions: [] }
@@ -105,30 +106,21 @@ function getRect(doc: DocumentState, id: ShapeId): Rect | null {
 	return doc.shapes.get(id) ?? null
 }
 
-type ModeKind = Mode["kind"]
-type ModeOf<K extends ModeKind> = Extract<Mode, { kind: K }>
-type StateWithMode<K extends ModeKind> = EditorState & {
-	session: SessionState & { mode: ModeOf<K> }
-}
-
-type ModeHandlerMap = {
-	[K in ModeKind]?: (
-		prev: StateWithMode<K>,
-		event: PointerEditorEvent,
-	) => PointerResult
-}
-
 function handleByMode(
 	handlers: ModeHandlerMap,
 	prev: EditorState,
 	event: PointerEditorEvent,
 ): PointerResult {
-	const kind = prev.session.mode.kind
-	const handler = handlers[kind] as
-		| ((p: EditorState, e: PointerEditorEvent) => PointerResult)
-		| undefined
+	return handlers[prev.session.mode.kind]?.(prev, event) ?? noop(prev)
+}
 
-	return handler ? handler(prev, event) : noop(prev)
+// Narrow mode inside handlers without heavy mapped typing
+function requireMode<K extends ModeKind>(
+	prev: EditorState,
+	kind: K,
+): Extract<Mode, { kind: K }> | null {
+	const mode = prev.session.mode
+	return mode.kind === kind ? (mode as Extract<Mode, { kind: K }>) : null
 }
 
 function toIdle(prev: EditorState): PointerResult {
@@ -227,10 +219,10 @@ const moveByMode: ModeHandlerMap = {
 	},
 
 	armed(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "armed")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 
-		const { origin, intent, pointerId } = m
+		const { origin, intent, pointerId } = mode
 		if (!hasDragged(origin, event.position)) return noop(prev)
 
 		if (intent.kind === "drawRect") {
@@ -271,14 +263,14 @@ const moveByMode: ModeHandlerMap = {
 	},
 
 	draggingSelection(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "draggingSelection")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 
 		return {
 			session: {
 				...prev.session,
 				mode: {
-					...prev.session.mode,
+					...mode,
 					currentPointer: event.position,
 				},
 			},
@@ -288,11 +280,11 @@ const moveByMode: ModeHandlerMap = {
 	},
 
 	drawingRect(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "drawingRect")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 
 		return {
-			session: { ...prev.session, mode: { ...m, current: event.position } },
+			session: { ...prev.session, mode: { ...mode, current: event.position } },
 			debug: prev.debug,
 			actions: [],
 		}
@@ -308,18 +300,18 @@ function POINTER_MOVE(
 
 const upByMode: ModeHandlerMap = {
 	armed(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "armed")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 		return toIdle(prev)
 	},
 
 	draggingSelection(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "draggingSelection")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 
-		const d = delta(m.startPointer, event.position)
-		const pos = translateRect(m.startRect, d)
-		const action = createUpdateRectPosition(prev.doc, m.shapeId, pos)
+		const d = delta(mode.startPointer, event.position)
+		const pos = translateRect(mode.startRect, d)
+		const action = createUpdateRectPosition(prev.doc, mode.shapeId, pos)
 
 		return {
 			session: {
@@ -332,13 +324,13 @@ const upByMode: ModeHandlerMap = {
 	},
 
 	drawingRect(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "drawingRect")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 
 		return {
 			session: { ...prev.session, mode: { kind: "idle" } },
 			debug: prev.debug,
-			actions: [createAddRect(m.origin, event.position)],
+			actions: [createAddRect(mode.origin, event.position)],
 		}
 	},
 }
@@ -351,22 +343,22 @@ function POINTER_UP(
 }
 
 const cancelByMode: ModeHandlerMap = {
-	idle(prev) {
+	idle(prev, _event) {
 		return cancelToIdle(prev)
 	},
 	armed(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "armed")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
 	drawingRect(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "drawingRect")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
 	draggingSelection(prev, event) {
-		const m = prev.session.mode
-		if (!samePointer(m, event)) return noop(prev)
+		const mode = requireMode(prev, "draggingSelection")
+		if (!mode || !samePointer(mode, event)) return noop(prev)
 		return cancelToIdle(prev)
 	},
 }
@@ -378,17 +370,20 @@ function POINTER_CANCEL(
 	return handleByMode(cancelByMode, prev, event)
 }
 
-const pointerEventHandlers: Record<PointerEventType, PointerEventHandler> = {
-	POINTER_DOWN,
-	POINTER_MOVE,
-	POINTER_UP,
-	POINTER_CANCEL,
-}
-
 export function pointerReducer(
 	prev: EditorState,
 	event: PointerEditorEvent,
 ): PointerResult {
-	const handler = pointerEventHandlers[event.type]
-	return handler ? handler(prev, event) : noop(prev)
+	switch (event.type) {
+		case "POINTER_DOWN":
+			return POINTER_DOWN(prev, event)
+		case "POINTER_MOVE":
+			return POINTER_MOVE(prev, event)
+		case "POINTER_UP":
+			return POINTER_UP(prev, event)
+		case "POINTER_CANCEL":
+			return POINTER_CANCEL(prev, event)
+		default:
+			return noop(prev)
+	}
 }
