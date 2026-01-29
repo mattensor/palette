@@ -1,9 +1,11 @@
 import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
+import { createAddRect } from "@/components/EditorCanvas/reducer/actions/createAddRect"
+import { createUpdateRectPosition } from "@/components/EditorCanvas/reducer/actions/createUpdateRectPosition"
 
 import type {
 	CanvasPoint,
 	DebugState,
-	DocEffect,
+	DocAction,
 	DocumentState,
 	EditorState,
 	Mode,
@@ -17,7 +19,7 @@ import type {
 type PointerResult = {
 	session: SessionState
 	debug: DebugState // feels like a smell need to clean this up
-	effects: DocEffect[]
+	actions: DocAction[]
 }
 
 type PointerEventHandler = (
@@ -26,7 +28,7 @@ type PointerEventHandler = (
 ) => PointerResult
 
 function noop(prev: EditorState): PointerResult {
-	return { session: prev.session, debug: prev.debug, effects: [] }
+	return { session: prev.session, debug: prev.debug, actions: [] }
 }
 
 function incHitTests(debug: DebugState): DebugState {
@@ -60,7 +62,7 @@ function updateHover(
 		return {
 			session: { ...prev.session, hover: { kind: "none" } },
 			debug,
-			effects: [],
+			actions: [],
 		}
 	}
 
@@ -75,7 +77,7 @@ function updateHover(
 	return {
 		session: { ...prev.session, hover: { kind: "shape", id: hitShapeId } },
 		debug,
-		effects: [],
+		actions: [],
 	}
 }
 
@@ -133,7 +135,7 @@ function toIdle(prev: EditorState): PointerResult {
 	return {
 		session: { ...prev.session, mode: { kind: "idle" } },
 		debug: prev.debug,
-		effects: [],
+		actions: [],
 	}
 }
 
@@ -145,7 +147,7 @@ function cancelToIdle(prev: EditorState): PointerResult {
 			hover: { kind: "none" },
 		},
 		debug: prev.debug,
-		effects: [],
+		actions: [],
 	}
 }
 
@@ -172,7 +174,7 @@ const downByMode: ModeHandlerMap = {
 					selection: { kind: "none" },
 				},
 				debug,
-				effects: [],
+				actions: [],
 			}
 		}
 
@@ -201,7 +203,7 @@ const downByMode: ModeHandlerMap = {
 				selection: { kind: "shape", id: hitShapeId },
 			},
 			debug,
-			effects: [],
+			actions: [],
 		}
 	},
 }
@@ -243,7 +245,7 @@ const moveByMode: ModeHandlerMap = {
 					},
 				},
 				debug: prev.debug,
-				effects: [],
+				actions: [],
 			}
 		}
 
@@ -261,7 +263,7 @@ const moveByMode: ModeHandlerMap = {
 					},
 				},
 				debug: prev.debug,
-				effects: [],
+				actions: [],
 			}
 		}
 
@@ -281,7 +283,7 @@ const moveByMode: ModeHandlerMap = {
 				},
 			},
 			debug: prev.debug,
-			effects: [],
+			actions: [],
 		}
 	},
 
@@ -292,7 +294,7 @@ const moveByMode: ModeHandlerMap = {
 		return {
 			session: { ...prev.session, mode: { ...m, current: event.position } },
 			debug: prev.debug,
-			effects: [],
+			actions: [],
 		}
 	},
 }
@@ -317,12 +319,7 @@ const upByMode: ModeHandlerMap = {
 
 		const d = delta(m.startPointer, event.position)
 		const pos = translateRect(m.startRect, d)
-		const effect: DocEffect = {
-			type: "SET_SHAPE_POSITION",
-			id: m.shapeId,
-			x: pos.x,
-			y: pos.y,
-		}
+		const action = createUpdateRectPosition(prev.doc, m.shapeId, pos)
 
 		return {
 			session: {
@@ -330,7 +327,7 @@ const upByMode: ModeHandlerMap = {
 				mode: { kind: "idle" },
 			},
 			debug: prev.debug,
-			effects: [effect],
+			actions: action ? [action] : [],
 		}
 	},
 
@@ -338,16 +335,10 @@ const upByMode: ModeHandlerMap = {
 		const m = prev.session.mode
 		if (!samePointer(m, event)) return noop(prev)
 
-		const effect: DocEffect = {
-			type: "COMMIT_DRAW_RECT",
-			origin: m.origin,
-			current: event.position,
-		}
-
 		return {
 			session: { ...prev.session, mode: { kind: "idle" } },
 			debug: prev.debug,
-			effects: [effect],
+			actions: [createAddRect(m.origin, event.position)],
 		}
 	},
 }

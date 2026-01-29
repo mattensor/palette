@@ -1,5 +1,5 @@
 import { withDevLog } from "@/components/EditorCanvas/reducer/devLog"
-import { docReducer } from "@/components/EditorCanvas/reducer/docReducer"
+import { docStoreReducer } from "@/components/EditorCanvas/reducer/docStoreReducer"
 import { keyboardReducer } from "@/components/EditorCanvas/reducer/keyboardReducer"
 import { pointerReducer } from "@/components/EditorCanvas/reducer/pointerReducer"
 import type {
@@ -15,8 +15,9 @@ export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 			? keyboardReducer(prev, event as KeyboardEditorEvent)
 			: pointerReducer(prev, event as PointerEditorEvent)
 
-	const { session, debug, effects } = result
-	const doc = effects.reduce(docReducer, prev.doc)
+	const { session, debug, actions } = result
+
+	const doc = actions.reduce(docStoreReducer, prev.doc)
 
 	let next: EditorState = {
 		...prev,
@@ -38,7 +39,7 @@ export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 		}
 	}
 
-	next = withDevLog({ prev, next, effects })
+	next = withDevLog({ prev, next, effects: [] })
 
 	return next
 }

@@ -1,6 +1,7 @@
+import { createRemoveRect } from "@/components/EditorCanvas/reducer/actions/createRemoveRect"
 import type {
 	DebugState,
-	DocEffect,
+	DocAction,
 	EditorState,
 	KeyboardEditorEvent,
 	KeyboardEventType,
@@ -10,7 +11,7 @@ import type {
 type PointerResult = {
 	session: SessionState
 	debug: DebugState
-	effects: DocEffect[]
+	actions: DocAction[]
 }
 type KeyboardEventHandler = (
 	prev: EditorState,
@@ -18,7 +19,7 @@ type KeyboardEventHandler = (
 ) => PointerResult
 
 function noop(prev: EditorState): PointerResult {
-	return { session: prev.session, debug: prev.debug, effects: [] }
+	return { session: prev.session, debug: prev.debug, actions: [] }
 }
 
 function KEY_DOWN(
@@ -29,10 +30,7 @@ function KEY_DOWN(
 
 	// later refactor this to a map structure
 	if (event.key === "Backspace" || event.key === "Delete") {
-		const effect: DocEffect = {
-			type: "REMOVE_SHAPE",
-			id: prev.session.selection.id,
-		}
+		const action = createRemoveRect(prev.doc, prev.session.selection.id)
 
 		return {
 			session: {
@@ -40,7 +38,7 @@ function KEY_DOWN(
 				selection: { kind: "none" },
 			},
 			debug: prev.debug,
-			effects: [effect],
+			actions: action ? [action] : [],
 		}
 	}
 

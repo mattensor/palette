@@ -6,6 +6,10 @@ export function createInitialState(): EditorState {
 			shapes: new Map(),
 			shapeOrder: [],
 		},
+		history: {
+			past: [],
+			future: [],
+		},
 		session: {
 			mode: { kind: "idle" },
 			selection: { kind: "none" },
