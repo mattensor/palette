@@ -48,6 +48,15 @@ export function keyboardReducer(
 		case "Backspace":
 		case "Delete":
 			return deleteSelection(prev)
+		case "z": {
+			const actionType = event.modifiers.shift ? "REDO" : "UNDO"
+
+			return {
+				session: withClearedSelection(prev),
+				debug: prev.debug,
+				actions: [{ type: actionType }],
+			}
+		}
 
 		default:
 			return noop(prev)
