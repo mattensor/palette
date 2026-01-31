@@ -23,19 +23,35 @@ function inversePatch(patch: DocPatch): DocPatch {
 	}
 }
 
+function getHistoryInfo(history: EditorState["history"]) {
+	const pastLength = history.past.length
+	const futureLength = history.future.length
+
+	return {
+		depth: pastLength,
+		canUndo: pastLength > 0,
+		canRedo: futureLength > 0,
+	}
+}
+
 function undo(prev: EditorState): EditorState {
 	const patch = prev.history.past.at(-1)
 	if (!patch) return prev
 
 	const inverse = inversePatch(patch)
 
+	const history = {
+		past: prev.history.past.slice(0, -1),
+		future: [...prev.history.future, patch],
+	}
+
 	return {
 		...prev,
 		doc: docReducer(prev.doc, inverse),
-		history: {
-			...prev.history,
-			past: prev.history.past.slice(0, -1),
-			future: [...prev.history.future, patch],
+		history,
+		debug: {
+			...prev.debug,
+			historyInfo: getHistoryInfo(history),
 		},
 	}
 }
@@ -44,13 +60,18 @@ function redo(prev: EditorState): EditorState {
 	const patch = prev.history.future.at(-1)
 	if (!patch) return prev
 
+	const history = {
+		past: [...prev.history.past, patch],
+		future: prev.history.future.slice(0, -1),
+	}
+
 	return {
 		...prev,
 		doc: docReducer(prev.doc, patch),
-		history: {
-			...prev.history,
-			past: [...prev.history.past, patch],
-			future: prev.history.future.slice(0, -1),
+		history,
+		debug: {
+			...prev.debug,
+			historyInfo: getHistoryInfo(history),
 		},
 	}
 }
@@ -63,20 +84,28 @@ export function historyReducer(
 		case "COMMIT": {
 			const patch = action.patch
 
+			const history = {
+				past: [...prev.history.past, patch],
+				future: [], // invalidate future history
+			}
+
 			return {
 				...prev,
 				doc: docReducer(prev.doc, patch),
-				history: {
-					...prev.history,
-					past: [...prev.history.past, patch],
-					future: [], // invalidate past future history
+				history,
+				debug: {
+					...prev.debug,
+					historyInfo: getHistoryInfo(history),
 				},
 			}
 		}
+
 		case "UNDO":
 			return undo(prev)
+
 		case "REDO":
 			return redo(prev)
+
 		default:
 			return prev
 	}

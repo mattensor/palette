@@ -6,6 +6,7 @@ import { docActionFactory } from "@/factories/docActionFactory"
 import { docFactory } from "@/factories/docFactory"
 import { docPatchFactory } from "@/factories/docPatchFactory"
 import { editorStateFactory } from "@/factories/editorStateFactory"
+import { historyInfoFactory } from "@/factories/historyInfoFactory"
 import { rectFactory } from "@/factories/rectFactory"
 
 describe("historyReducer", () => {
@@ -30,6 +31,8 @@ describe("historyReducer", () => {
 		expect(next.history.past).toEqual([patch])
 		expect(next.history.future).toEqual([])
 
+		expect(next.debug.historyInfo).toEqual(historyInfoFactory(next.history))
+
 		expect(next.doc.shapes.get(id)).toEqual(rect)
 		expect(next.doc.shapeOrder).toEqual([id])
 	})
@@ -52,10 +55,16 @@ describe("historyReducer", () => {
 		expect(applied.doc.shapes.has(id)).toBe(true)
 		expect(applied.history.past).toEqual([addPatch])
 
+		expect(applied.debug.historyInfo).toEqual(
+			historyInfoFactory(applied.history),
+		)
+
 		const undone = historyReducer(applied, docActionFactory.undo())
 
 		expect(undone.history.past).toEqual([])
 		expect(undone.history.future).toEqual([addPatch])
+
+		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
 
 		expect(undone.doc.shapes.has(id)).toBe(false)
 		expect(undone.doc.shapeOrder).toEqual([])
@@ -80,10 +89,14 @@ describe("historyReducer", () => {
 		expect(undone.doc.shapes.has(id)).toBe(false)
 		expect(undone.history.future).toEqual([addPatch])
 
+		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
+
 		const redone = historyReducer(undone, docActionFactory.redo())
 
 		expect(redone.history.past).toEqual([addPatch])
 		expect(redone.history.future).toEqual([])
+
+		expect(redone.debug.historyInfo).toEqual(historyInfoFactory(redone.history))
 
 		expect(redone.doc.shapes.get(id)).toEqual(rect)
 		expect(redone.doc.shapeOrder).toEqual([id])
@@ -108,11 +121,17 @@ describe("historyReducer", () => {
 		expect(applied.doc.shapes.get(id)).toEqual(after)
 		expect(applied.history.past).toEqual([patch])
 
+		expect(applied.debug.historyInfo).toEqual(
+			historyInfoFactory(applied.history),
+		)
+
 		const undone = historyReducer(applied, docActionFactory.undo())
 
 		expect(undone.doc.shapes.get(id)).toEqual(before)
 		expect(undone.history.past).toEqual([])
 		expect(undone.history.future).toEqual([patch])
+
+		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
 	})
 
 	it("UNDO: noops when there is nothing to undo", () => {
@@ -146,11 +165,14 @@ describe("historyReducer", () => {
 		const s1 = historyReducer(editorStateFactory(), docActionFactory.commit(p1))
 		const s2 = historyReducer(s1, docActionFactory.undo())
 
-		// now future has p1
 		expect(s2.history.future).toEqual([p1])
 
+		expect(s2.debug.historyInfo).toEqual(historyInfoFactory(s2.history))
+
 		const s3 = historyReducer(s2, docActionFactory.commit(p2))
-		expect(s3.history.future).toEqual([]) // branched: cleared
-		expect(s3.history.past).toEqual([p2]) // typical behavior (only committed patch in past)
+		expect(s3.history.future).toEqual([])
+		expect(s3.history.past).toEqual([p2])
+
+		expect(s3.debug.historyInfo).toEqual(historyInfoFactory(s3.history))
 	})
 })

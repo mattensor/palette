@@ -75,3 +75,18 @@ Metrics are sampled per animation frame and are intended for sanity-checking, no
 
 ---
 
+## Undo / Redo
+
+### History depth (`historyDepth`)
+
+- **Observation:**  
+  Undo / redo correctness depends on the editor committing semantic user actions rather than mechanical state changes.
+
+- **Metric:**  
+  `historyDepth` — number of committed, undoable editor states.
+
+- **Target:**  
+  History depth increases only on semantic commits (e.g. completed drags, discrete commands) and never decreases below the root state.
+
+- **Result:**  
+  History depth correlates with user intent, redo invalidation behaves correctly, and multi-step interactions are batched into single undoable actions.

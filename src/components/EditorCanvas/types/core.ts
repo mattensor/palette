@@ -9,6 +9,12 @@ export type Metrics = {
 	hitTests: number
 }
 
+export type HistoryInfo = {
+	depth: number
+	canUndo: boolean
+	canRedo: boolean
+}
+
 export type DevLogEvent = {
 	ts: number
 	name: string
@@ -17,6 +23,7 @@ export type DevLogEvent = {
 
 export type DebugState = {
 	metrics: Metrics
+	historyInfo: HistoryInfo
 	devLog: readonly DevLogEvent[]
 }
 

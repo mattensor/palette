@@ -22,6 +22,11 @@ export function createInitialState(): EditorState {
 				eventsProcessed: 0,
 				hitTests: 0,
 			},
+			historyInfo: {
+				depth: 0,
+				canRedo: false,
+				canUndo: false,
+			},
 			devLog: [],
 		},
 	}

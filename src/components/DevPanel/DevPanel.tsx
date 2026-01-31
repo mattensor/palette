@@ -56,9 +56,8 @@ function toLogRows(devLog: readonly DevLogEntry[]): LogRow[] {
 
 export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 	const { mode, debug } = snapshot
-	const { metrics, devLog } = debug
+	const { metrics, devLog, historyInfo } = debug
 
-	// slice first so deltas are correct for what you display
 	const recent = getLastN(devLog as readonly DevLogEntry[], LOGS_TO_SHOW)
 	const recentLogRows = toLogRows(recent).reverse()
 
@@ -81,6 +80,20 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 
 				<div>hitTests</div>
 				<div>{metrics.hitTests}</div>
+			</div>
+
+			{/* NEW: Undo / Redo visibility */}
+			<div className={styles.sectionTitle}>history</div>
+
+			<div className={styles.grid}>
+				<div>depth</div>
+				<div>{historyInfo.depth}</div>
+
+				<div>canUndo</div>
+				<div>{historyInfo.canUndo ? "true" : "false"}</div>
+
+				<div>canRedo</div>
+				<div>{historyInfo.canRedo ? "true" : "false"}</div>
 			</div>
 
 			<div className={styles.sectionTitle}>devLog</div>
