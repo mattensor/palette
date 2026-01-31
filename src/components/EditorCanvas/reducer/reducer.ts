@@ -38,6 +38,6 @@ export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 		}
 	}
 
-	next = withDevLog({ prev, next, effects: [] })
+	next = withDevLog({ prev, next, actions })
 	return next
 }
