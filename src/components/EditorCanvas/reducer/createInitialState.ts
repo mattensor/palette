@@ -14,6 +14,7 @@ export function createInitialState(): EditorState {
 			mode: { kind: "idle" },
 			selection: { kind: "none" },
 			hover: { kind: "none" },
+			latestPointer: { kind: "none" },
 		},
 		debug: {
 			metrics: {
@@ -28,6 +29,10 @@ export function createInitialState(): EditorState {
 				canUndo: false,
 			},
 			devLog: [],
+		},
+		frameInput: {
+			latestPointerById: new Map(),
+			lastFrameTs: null,
 		},
 	}
 }

@@ -5,7 +5,7 @@ export function historyInfoFactory(history: History) {
 	const futureLength = history.future.length
 
 	return {
-		depth: pastLength + 1,
+		depth: pastLength,
 		canUndo: pastLength > 0,
 		canRedo: futureLength > 0,
 	}

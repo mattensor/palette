@@ -2,18 +2,13 @@ import { withDevLog } from "@/components/EditorCanvas/reducer/devLog"
 import { historyReducer } from "@/components/EditorCanvas/reducer/historyReducer"
 import { keyboardReducer } from "@/components/EditorCanvas/reducer/keyboardReducer"
 import { pointerReducer } from "@/components/EditorCanvas/reducer/pointerReducer"
-import type {
-	EditorEvent,
-	EditorState,
-	KeyboardEditorEvent,
-	PointerEditorEvent,
-} from "@/components/EditorCanvas/types"
+import type { EditorEvent, EditorState } from "@/components/EditorCanvas/types"
 
 export function reducer(prev: EditorState, event: EditorEvent): EditorState {
 	const result =
 		event.type === "KEY_DOWN"
-			? keyboardReducer(prev, event as KeyboardEditorEvent)
-			: pointerReducer(prev, event as PointerEditorEvent)
+			? keyboardReducer(prev, event)
+			: pointerReducer(prev, event)
 
 	const { session, debug, actions } = result
 

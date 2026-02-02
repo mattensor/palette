@@ -1,4 +1,5 @@
 export * from "./actions"
 export * from "./core"
 export * from "./domain"
+export * from "./editor-event"
 export * from "./interaction"

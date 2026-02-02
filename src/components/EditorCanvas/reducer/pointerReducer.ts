@@ -7,9 +7,10 @@ import type {
 	DebugState,
 	DocAction,
 	DocumentState,
+	EditorEvent,
 	EditorState,
-	Mode,
 	PointerEditorEvent,
+	PointerId,
 	Rect,
 	SessionState,
 	ShapeId,
@@ -21,24 +22,56 @@ type PointerResult = {
 	actions: DocAction[]
 }
 
-type ModeKind = Mode["kind"]
-type ModeHandler = (
-	prev: EditorState,
-	event: PointerEditorEvent,
-) => PointerResult
-type ModeHandlerMap = Partial<Record<ModeKind, ModeHandler>>
+/** ---------- tiny helpers: return shapes ---------- */
 
 function noop(prev: EditorState): PointerResult {
 	return { session: prev.session, debug: prev.debug, actions: [] }
 }
 
+function setMode(prev: EditorState, mode: SessionState["mode"]): PointerResult {
+	return { session: { ...prev.session, mode }, debug: prev.debug, actions: [] }
+}
+
+function toIdle(prev: EditorState): PointerResult {
+	return setMode(prev, { kind: "idle" })
+}
+
+function cancelToIdle(prev: EditorState): PointerResult {
+	return {
+		session: {
+			...prev.session,
+			mode: { kind: "idle" },
+			hover: { kind: "none" },
+		},
+		debug: prev.debug,
+		actions: [],
+	}
+}
+
+/** ---------- geometry ---------- */
+
+const MIN_DRAG = 3
+function hasDragged(a: CanvasPoint, b: CanvasPoint) {
+	return Math.abs(a.x - b.x) > MIN_DRAG || Math.abs(a.y - b.y) > MIN_DRAG
+}
+
+function delta(from: CanvasPoint, to: CanvasPoint) {
+	return { dx: to.x - from.x, dy: to.y - from.y }
+}
+
+function translateRect(
+	rect: Pick<Rect, "x" | "y">,
+	d: { dx: number; dy: number },
+) {
+	return { x: rect.x + d.dx, y: rect.y + d.dy }
+}
+
+/** ---------- hit testing + hover (with metrics) ---------- */
+
 function incHitTests(debug: DebugState): DebugState {
 	return {
 		...debug,
-		metrics: {
-			...debug.metrics,
-			hitTests: debug.metrics.hitTests + 1,
-		},
+		metrics: { ...debug.metrics, hitTests: debug.metrics.hitTests + 1 },
 	}
 }
 
@@ -55,11 +88,9 @@ function updateHover(
 	hitShapeId: ShapeId | null,
 	debug: DebugState,
 ): PointerResult {
+	// no hit
 	if (hitShapeId == null) {
-		if (prev.session.hover.kind === "none") {
-			// still return updated debug to preserve metric increment
-			return { ...noop(prev), debug }
-		}
+		if (prev.session.hover.kind === "none") return { ...noop(prev), debug }
 		return {
 			session: { ...prev.session, hover: { kind: "none" } },
 			debug,
@@ -67,14 +98,15 @@ function updateHover(
 		}
 	}
 
+	// hit same
 	if (
 		prev.session.hover.kind === "shape" &&
 		prev.session.hover.id === hitShapeId
 	) {
-		// still return updated debug to preserve metric increment
 		return { ...noop(prev), debug }
 	}
 
+	// new hit
 	return {
 		session: { ...prev.session, hover: { kind: "shape", id: hitShapeId } },
 		debug,
@@ -82,101 +114,35 @@ function updateHover(
 	}
 }
 
-const MIN_DRAG = 3
-function hasDragged(a: CanvasPoint, b: CanvasPoint) {
-	return Math.abs(a.x - b.x) > MIN_DRAG || Math.abs(a.y - b.y) > MIN_DRAG
-}
-
-function samePointer(mode: { pointerId: unknown }, event: PointerEditorEvent) {
-	return mode.pointerId === event.pointerId
-}
-
-function delta(from: CanvasPoint, to: CanvasPoint) {
-	return { dx: to.x - from.x, dy: to.y - from.y }
-}
-
-function translateRect(
-	rect: Pick<Rect, "x" | "y">,
-	d: { dx: number; dy: number },
-) {
-	return { x: rect.x + d.dx, y: rect.y + d.dy }
-}
-
 function getRect(doc: DocumentState, id: ShapeId): Rect | null {
 	return doc.shapes.get(id) ?? null
 }
 
-function handleByMode(
-	handlers: ModeHandlerMap,
+/** Prefer the latest sampled pointer position when available. */
+function bestPointerPosition(
+	prev: EditorState,
+	pointerId: PointerId,
+	fallback: CanvasPoint,
+) {
+	const lp = prev.session.latestPointer
+	return lp.kind === "some" && lp.pointerId === pointerId
+		? lp.position
+		: fallback
+}
+
+/** ---------- event handlers ---------- */
+
+function onPointerDown(
 	prev: EditorState,
 	event: PointerEditorEvent,
 ): PointerResult {
-	return handlers[prev.session.mode.kind]?.(prev, event) ?? noop(prev)
-}
+	// Only meaningful from idle.
+	if (prev.session.mode.kind !== "idle") return noop(prev)
 
-// Narrow mode inside handlers without heavy mapped typing
-function requireMode<K extends ModeKind>(
-	prev: EditorState,
-	kind: K,
-): Extract<Mode, { kind: K }> | null {
-	const mode = prev.session.mode
-	return mode.kind === kind ? (mode as Extract<Mode, { kind: K }>) : null
-}
+	const { hitShapeId, debug } = hitTest(prev, event.position)
 
-function toIdle(prev: EditorState): PointerResult {
-	return {
-		session: { ...prev.session, mode: { kind: "idle" } },
-		debug: prev.debug,
-		actions: [],
-	}
-}
-
-function cancelToIdle(prev: EditorState): PointerResult {
-	return {
-		session: {
-			...prev.session,
-			mode: { kind: "idle" },
-			hover: { kind: "none" },
-		},
-		debug: prev.debug,
-		actions: [],
-	}
-}
-
-/**
- * POINTER_DOWN
- * - Hit-test exactly once to resolve intent.
- */
-const downByMode: ModeHandlerMap = {
-	idle(prev, event) {
-		const { hitShapeId, debug } = hitTest(prev, event.position)
-
-		// Clicked empty space: arm for drawing.
-		if (hitShapeId == null) {
-			return {
-				session: {
-					...prev.session,
-					mode: {
-						kind: "armed",
-						pointerId: event.pointerId,
-						origin: event.position,
-						intent: { kind: "drawRect" },
-					},
-					hover: { kind: "none" },
-					selection: { kind: "none" },
-				},
-				debug,
-				actions: [],
-			}
-		}
-
-		// Clicked shape: arm for dragging (only if we can resolve rect).
-		const rect = getRect(prev.doc, hitShapeId)
-		if (!rect) {
-			// still preserve debug increment
-			return { ...noop(prev), debug }
-		}
-
+	// empty space => arm draw
+	if (hitShapeId == null) {
 		return {
 			session: {
 				...prev.session,
@@ -184,205 +150,199 @@ const downByMode: ModeHandlerMap = {
 					kind: "armed",
 					pointerId: event.pointerId,
 					origin: event.position,
-					intent: {
-						kind: "dragSelection",
-						shapeId: hitShapeId,
-						startPointer: event.position,
-						startRect: rect,
-					},
+					intent: { kind: "drawRect" },
 				},
 				hover: { kind: "none" },
-				selection: { kind: "shape", id: hitShapeId },
+				selection: { kind: "none" },
 			},
 			debug,
 			actions: [],
 		}
-	},
-}
+	}
 
-function POINTER_DOWN(
-	prev: EditorState,
-	event: PointerEditorEvent,
-): PointerResult {
-	return handleByMode(downByMode, prev, event)
+	// shape => arm drag (only if rect exists)
+	const rect = getRect(prev.doc, hitShapeId)
+	if (!rect) return { ...noop(prev), debug }
+
+	return {
+		session: {
+			...prev.session,
+			mode: {
+				kind: "armed",
+				pointerId: event.pointerId,
+				origin: event.position,
+				intent: {
+					kind: "dragSelection",
+					shapeId: hitShapeId,
+					startPointer: event.position,
+					startRect: rect,
+				},
+			},
+			hover: { kind: "none" },
+			selection: { kind: "shape", id: hitShapeId },
+		},
+		debug,
+		actions: [],
+	}
 }
 
 /**
- * POINTER_MOVE
- * - While idle: hit-test to update hover.
- * - While armed/dragging: no hit-test needed (we already resolved intent on down).
+ * POINTER_MOVE: sample only
+ * - store latest pointer sample for FRAME_TICK to consume
  */
-const moveByMode: ModeHandlerMap = {
-	idle(prev, event) {
-		const { hitShapeId, debug } = hitTest(prev, event.position)
-		return updateHover(prev, hitShapeId, debug)
-	},
+function onPointerMove(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
+	return {
+		session: {
+			...prev.session,
+			latestPointer: {
+				kind: "some",
+				pointerId: event.pointerId,
+				position: event.position,
+			},
+		},
+		debug: prev.debug,
+		actions: [],
+	}
+}
 
-	armed(prev, event) {
-		const mode = requireMode(prev, "armed")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
+/**
+ * FRAME_TICK: advance interaction once per frame using latest pointer sample
+ * - idle: hover hit test (bounded)
+ * - armed: threshold -> transition to drawing/dragging
+ * - dragging/drawing: update preview
+ */
+function onFrameTick(prev: EditorState): PointerResult {
+	const lp = prev.session.latestPointer
+	if (lp.kind !== "some") return noop(prev)
 
-		const { origin, intent, pointerId } = mode
-		if (!hasDragged(origin, event.position)) return noop(prev)
+	const { pointerId, position } = lp
+	const mode = prev.session.mode
 
-		if (intent.kind === "drawRect") {
+	switch (mode.kind) {
+		case "idle": {
+			const { hitShapeId, debug } = hitTest(prev, position)
+			return updateHover(prev, hitShapeId, debug)
+		}
+
+		case "armed": {
+			if (mode.pointerId !== pointerId) return noop(prev)
+			if (!hasDragged(mode.origin, position)) return noop(prev)
+
+			if (mode.intent.kind === "drawRect") {
+				return setMode(prev, {
+					kind: "drawingRect",
+					pointerId,
+					origin: mode.origin,
+					current: position,
+				})
+			}
+
+			// dragSelection
+			return setMode(prev, {
+				kind: "draggingSelection",
+				shapeId: mode.intent.shapeId,
+				pointerId,
+				startPointer: mode.intent.startPointer,
+				currentPointer: position,
+				startRect: mode.intent.startRect,
+			})
+		}
+
+		case "draggingSelection": {
+			if (mode.pointerId !== pointerId) return noop(prev)
+			return setMode(prev, { ...mode, currentPointer: position })
+		}
+
+		case "drawingRect": {
+			if (mode.pointerId !== pointerId) return noop(prev)
+			return setMode(prev, { ...mode, current: position })
+		}
+
+		default:
+			return noop(prev)
+	}
+}
+
+function onPointerUp(
+	prev: EditorState,
+	event: PointerEditorEvent,
+): PointerResult {
+	const mode = prev.session.mode
+
+	switch (mode.kind) {
+		case "armed": {
+			if (mode.pointerId !== event.pointerId) return noop(prev)
+			return toIdle(prev)
+		}
+
+		case "draggingSelection": {
+			if (mode.pointerId !== event.pointerId) return noop(prev)
+
+			const end = bestPointerPosition(prev, event.pointerId, event.position)
+			const d = delta(mode.startPointer, end)
+			const pos = translateRect(mode.startRect, d)
+			const action = createUpdateRectPosition(prev.doc, mode.shapeId, pos)
+
 			return {
-				session: {
-					...prev.session,
-					mode: {
-						kind: "drawingRect",
-						pointerId,
-						origin,
-						current: event.position,
-					},
-				},
+				session: { ...prev.session, mode: { kind: "idle" } },
 				debug: prev.debug,
-				actions: [],
+				actions: action ? [action] : [],
 			}
 		}
 
-		if (intent.kind === "dragSelection") {
+		case "drawingRect": {
+			if (mode.pointerId !== event.pointerId) return noop(prev)
+
+			const end = bestPointerPosition(prev, event.pointerId, event.position)
+
 			return {
-				session: {
-					...prev.session,
-					mode: {
-						kind: "draggingSelection",
-						shapeId: intent.shapeId,
-						pointerId,
-						startPointer: intent.startPointer,
-						currentPointer: event.position,
-						startRect: intent.startRect,
-					},
-				},
+				session: { ...prev.session, mode: { kind: "idle" } },
 				debug: prev.debug,
-				actions: [],
+				actions: [createAddRect(mode.origin, end)],
 			}
 		}
 
-		return noop(prev)
-	},
-
-	draggingSelection(prev, event) {
-		const mode = requireMode(prev, "draggingSelection")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-
-		return {
-			session: {
-				...prev.session,
-				mode: {
-					...mode,
-					currentPointer: event.position,
-				},
-			},
-			debug: prev.debug,
-			actions: [],
-		}
-	},
-
-	drawingRect(prev, event) {
-		const mode = requireMode(prev, "drawingRect")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-
-		return {
-			session: { ...prev.session, mode: { ...mode, current: event.position } },
-			debug: prev.debug,
-			actions: [],
-		}
-	},
+		default:
+			return noop(prev)
+	}
 }
 
-function POINTER_MOVE(
+function onPointerCancel(
 	prev: EditorState,
 	event: PointerEditorEvent,
 ): PointerResult {
-	return handleByMode(moveByMode, prev, event)
-}
+	const mode = prev.session.mode
 
-const upByMode: ModeHandlerMap = {
-	armed(prev, event) {
-		const mode = requireMode(prev, "armed")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-		return toIdle(prev)
-	},
+	// idle cancels always clear hover
+	if (mode.kind === "idle") return cancelToIdle(prev)
 
-	draggingSelection(prev, event) {
-		const mode = requireMode(prev, "draggingSelection")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-
-		const d = delta(mode.startPointer, event.position)
-		const pos = translateRect(mode.startRect, d)
-		const action = createUpdateRectPosition(prev.doc, mode.shapeId, pos)
-
-		return {
-			session: {
-				...prev.session,
-				mode: { kind: "idle" },
-			},
-			debug: prev.debug,
-			actions: action ? [action] : [],
-		}
-	},
-
-	drawingRect(prev, event) {
-		const mode = requireMode(prev, "drawingRect")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-
-		return {
-			session: { ...prev.session, mode: { kind: "idle" } },
-			debug: prev.debug,
-			actions: [createAddRect(mode.origin, event.position)],
-		}
-	},
-}
-
-function POINTER_UP(
-	prev: EditorState,
-	event: PointerEditorEvent,
-): PointerResult {
-	return handleByMode(upByMode, prev, event)
-}
-
-const cancelByMode: ModeHandlerMap = {
-	idle(prev, _event) {
+	// otherwise cancel only if this pointer is the active one
+	if ("pointerId" in mode && mode.pointerId === event.pointerId)
 		return cancelToIdle(prev)
-	},
-	armed(prev, event) {
-		const mode = requireMode(prev, "armed")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-		return cancelToIdle(prev)
-	},
-	drawingRect(prev, event) {
-		const mode = requireMode(prev, "drawingRect")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-		return cancelToIdle(prev)
-	},
-	draggingSelection(prev, event) {
-		const mode = requireMode(prev, "draggingSelection")
-		if (!mode || !samePointer(mode, event)) return noop(prev)
-		return cancelToIdle(prev)
-	},
+
+	return noop(prev)
 }
 
-function POINTER_CANCEL(
-	prev: EditorState,
-	event: PointerEditorEvent,
-): PointerResult {
-	return handleByMode(cancelByMode, prev, event)
-}
+/** ---------- public reducer ---------- */
 
 export function pointerReducer(
 	prev: EditorState,
-	event: PointerEditorEvent,
+	event: EditorEvent,
 ): PointerResult {
 	switch (event.type) {
 		case "POINTER_DOWN":
-			return POINTER_DOWN(prev, event)
+			return onPointerDown(prev, event)
 		case "POINTER_MOVE":
-			return POINTER_MOVE(prev, event)
+			return onPointerMove(prev, event)
+		case "FRAME_TICK":
+			return onFrameTick(prev)
 		case "POINTER_UP":
-			return POINTER_UP(prev, event)
+			return onPointerUp(prev, event)
 		case "POINTER_CANCEL":
-			return POINTER_CANCEL(prev, event)
+			return onPointerCancel(prev, event)
 		default:
 			return noop(prev)
 	}

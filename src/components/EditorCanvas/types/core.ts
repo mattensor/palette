@@ -1,6 +1,11 @@
 import type { DocPatch } from "@/components/EditorCanvas/types/actions"
-import type { DocumentState } from "./domain"
+import type { CanvasPoint, DocumentState, PointerId } from "./domain"
 import type { SessionState } from "./interaction"
+
+export type FrameInput = {
+	latestPointerById: ReadonlyMap<PointerId, CanvasPoint>
+	lastFrameTs: number | null
+}
 
 export type Metrics = {
 	lastRenderMs: number | null
@@ -37,4 +42,5 @@ export type EditorState = {
 	session: SessionState
 	history: History
 	debug: DebugState
+	frameInput: FrameInput
 }

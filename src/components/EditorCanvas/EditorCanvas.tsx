@@ -77,6 +77,12 @@ export function EditorCanvas() {
 			editorStateRef.current = reducer(prev, event)
 		}
 
+		const prev = editorStateRef.current
+		editorStateRef.current = reducer(prev, {
+			type: "FRAME_TICK",
+			now: performance.now(),
+		})
+
 		const canvas = canvasRef.current
 		if (canvas == null) return
 

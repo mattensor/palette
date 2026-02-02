@@ -1,37 +1,5 @@
 import type { CanvasPoint, PointerId, Rect, ShapeId } from "./domain"
 
-export type Key = "Delete" | "Backspace" | "Escape" | "z"
-
-export type Modifiers = {
-	meta: boolean
-	shift: boolean
-	alt: boolean
-	ctrl: boolean
-}
-
-export type PointerEventType =
-	| "POINTER_DOWN"
-	| "POINTER_MOVE"
-	| "POINTER_UP"
-	| "POINTER_CANCEL"
-
-export type PointerEditorEvent = {
-	type: PointerEventType
-	pointerId: PointerId
-	position: CanvasPoint
-}
-
-export type KeyboardEventType = "KEY_DOWN"
-
-export type KeyboardEditorEvent = {
-	type: KeyboardEventType
-	key: Key
-	modifiers: Modifiers
-}
-
-export type EditorEvent = PointerEditorEvent | KeyboardEditorEvent
-export type EditorEventType = EditorEvent["type"]
-
 export type Intent =
 	| { kind: "drawRect" }
 	| {
@@ -66,9 +34,13 @@ export type Mode =
 
 export type Selection = { kind: "none" } | { kind: "shape"; id: ShapeId }
 export type Hover = { kind: "none" } | { kind: "shape"; id: ShapeId }
+export type LatestPointer =
+	| { kind: "none" }
+	| { kind: "some"; pointerId: PointerId; position: CanvasPoint }
 
 export type SessionState = {
 	mode: Mode
 	selection: Selection
 	hover: Hover
+	latestPointer: LatestPointer
 }

@@ -23,6 +23,7 @@ import { pointerReducer } from "@/components/EditorCanvas/reducer/pointerReducer
 import type {
 	CanvasPoint,
 	DocAction,
+	EditorEvent,
 	PointerEditorEvent,
 	PointerId,
 	Rect,
@@ -56,7 +57,19 @@ function withHitTests(
 	}
 }
 
-describe("pointerReducer", () => {
+function frameTick(now = 123): EditorEvent {
+	return { type: "FRAME_TICK", now } as EditorEvent
+}
+
+function move(pointerId: PointerId, position: CanvasPoint): PointerEditorEvent {
+	return pointerEventFactory({
+		type: "POINTER_MOVE",
+		pointerId,
+		position,
+	})
+}
+
+describe("pointerReducer (FRAME_TICK model)", () => {
 	beforeEach(() => {
 		hitTestMock.mockReset()
 		createAddRectMock.mockReset()
@@ -75,6 +88,7 @@ describe("pointerReducer", () => {
 					},
 					selection: { kind: "none" },
 					hover: { kind: "none" },
+					latestPointer: { kind: "none" },
 				},
 			})
 
@@ -140,6 +154,7 @@ describe("pointerReducer", () => {
 					...editorStateFactory().session,
 					hover: { kind: "shape", id: createShapeId("old-hover") },
 					selection: { kind: "shape", id: createShapeId("old-selection") },
+					latestPointer: { kind: "none" },
 				},
 			})
 			const prev = withHitTests(prev0, 7)
@@ -180,185 +195,106 @@ describe("pointerReducer", () => {
 
 			const res = pointerReducer(prev, event)
 
-			expect(res.session).toBe(prev.session) // noop path
+			expect(res.session).toBe(prev.session)
 			expect(res.actions).toEqual([])
 			expect(res.debug.metrics.hitTests).toBe(3)
 		})
 	})
 
-	describe("POINTER_MOVE", () => {
-		it("when idle: sets hover to shape when hitTest returns shape", () => {
-			const shapeId = createShapeId("shape-1")
-			hitTestMock.mockReturnValue(shapeId)
-
-			const prev0 = editorStateFactory()
-			const prev = withHitTests(prev0, 0)
-
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(5, 5),
+	describe("POINTER_MOVE (sampling only)", () => {
+		it("sets session.latestPointer and does not hitTest or change mode", () => {
+			const prev = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					mode: { kind: "idle" },
+					hover: { kind: "none" },
+					latestPointer: { kind: "none" },
+				},
 			})
+
+			const event = move(createPointerId("p1"), createPoint(5, 5))
 
 			const res = pointerReducer(prev, event)
 
-			expect(hitTestMock).toHaveBeenCalledWith(prev.doc, event.position)
+			expect(hitTestMock).not.toHaveBeenCalled()
+			expect(res.actions).toEqual([])
+			expect(res.debug).toBe(prev.debug)
+			expect(res.session.mode).toEqual({ kind: "idle" })
+			expect(res.session.latestPointer).toEqual({
+				kind: "some",
+				pointerId: createPointerId("p1"),
+				position: createPoint(5, 5),
+			})
+		})
+	})
+
+	describe("FRAME_TICK", () => {
+		it("idle: hitTests and sets hover to shape when hitTest returns shape", () => {
+			const shapeId = createShapeId("shape-1")
+			hitTestMock.mockReturnValue(shapeId)
+
+			const prev0 = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					latestPointer: { kind: "none" },
+				},
+			})
+			const prev = withHitTests(prev0, 0)
+
+			// sample pointer
+			const afterMove = pointerReducer(
+				prev,
+				move(createPointerId("p1"), createPoint(5, 5)),
+			)
+
+			const res = pointerReducer(
+				{ ...prev, session: afterMove.session, debug: afterMove.debug },
+				frameTick(),
+			)
+
+			expect(hitTestMock).toHaveBeenCalledWith(prev.doc, createPoint(5, 5))
 			expect(res.actions).toEqual([])
 			expect(res.debug.metrics.hitTests).toBe(1)
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual({ kind: "shape", id: shapeId })
 		})
 
-		it("when idle: clears hover when hitTest returns null", () => {
+		it("idle: clears hover when hitTest returns null", () => {
 			hitTestMock.mockReturnValue(null)
 
 			const prev0 = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
+					mode: { kind: "idle" },
 					hover: { kind: "shape", id: createShapeId("shape-1") },
+					latestPointer: { kind: "none" },
 				},
 			})
 			const prev = withHitTests(prev0, 3)
 
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(123, 456),
-			})
+			const afterMove = pointerReducer(
+				prev,
+				move(createPointerId("p1"), createPoint(123, 456)),
+			)
 
-			const res = pointerReducer(prev, event)
+			const res = pointerReducer(
+				{ ...prev, session: afterMove.session, debug: afterMove.debug },
+				frameTick(),
+			)
 
 			expect(res.actions).toEqual([])
 			expect(res.debug.metrics.hitTests).toBe(4)
 			expect(res.session.hover).toEqual({ kind: "none" })
 		})
 
-		it("when idle: hover already same shape => session noops but debug still updates", () => {
-			const shapeId = createShapeId("shape-1")
-			hitTestMock.mockReturnValue(shapeId)
-
-			const prev0 = editorStateFactory({
-				session: {
-					...editorStateFactory().session,
-					hover: { kind: "shape", id: shapeId },
-				},
-			})
-			const prev = withHitTests(prev0, 10)
-
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(9, 9),
-			})
-
-			const res = pointerReducer(prev, event)
-
-			expect(res.session).toBe(prev.session) // noop session
-			expect(res.actions).toEqual([])
-			expect(res.debug).not.toBe(prev.debug) // debug changed (hitTests increment)
-			expect(res.debug.metrics.hitTests).toBe(11)
-		})
-
-		it("when idle: hover already none + hitTest null => session noops but debug still updates", () => {
+		it("armed drawRect: stays armed until MIN_DRAG exceeded, then enters drawingRect", () => {
 			hitTestMock.mockReturnValue(null)
 
-			const prev0 = editorStateFactory({
-				session: { ...editorStateFactory().session, hover: { kind: "none" } },
-			})
-			const prev = withHitTests(prev0, 1)
-
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(1, 2),
-			})
-
-			const res = pointerReducer(prev, event)
-
-			expect(res.session).toBe(prev.session)
-			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(2)
-		})
-
-		it("armed drawRect: noops for non-active pointerId", () => {
-			const prev = editorStateFactory({
-				session: {
-					...editorStateFactory().session,
-					mode: {
-						kind: "armed",
-						pointerId: createPointerId("p1"),
-						origin: createPoint(0, 0),
-						intent: { kind: "drawRect" },
-					},
-				},
-			})
-
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p2"),
-				position: createPoint(10, 0),
-			})
-
-			const res = pointerReducer(prev, event)
-			expect(res.session).toBe(prev.session)
-			expect(res.actions).toEqual([])
-		})
-
-		it("armed drawRect: noops until MIN_DRAG exceeded, then enters drawingRect", () => {
-			hitTestMock.mockReturnValue(null)
-			const prev0 = withHitTests(editorStateFactory(), 0)
-
-			const down = pointerEventFactory({
-				type: "POINTER_DOWN",
-				pointerId: createPointerId("p1"),
-				position: createPoint(0, 0),
-			})
-			const armedRes = pointerReducer(prev0, down)
-			expect(armedRes.session.mode.kind).toBe("armed")
-
-			// still within threshold (<= 3px delta): noop
-			const moveSmall = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(3, 0),
-			})
-			const resSmall = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
-				moveSmall,
-			)
-			expect(resSmall.session).toBe(armedRes.session)
-			expect(resSmall.actions).toEqual([])
-
-			// exceeds threshold
-			const moveBig = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(4, 0),
-			})
-			const resBig = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
-				moveBig,
-			)
-
-			expect(resBig.actions).toEqual([])
-			expect(resBig.session.mode).toEqual({
-				kind: "drawingRect",
-				pointerId: createPointerId("p1"),
-				origin: createPoint(0, 0),
-				current: createPoint(4, 0),
-			})
-		})
-
-		it("armed dragSelection: noops until MIN_DRAG exceeded, then enters draggingSelection (no actions yet)", () => {
-			const shapeId = createShapeId("shape-1")
-			hitTestMock.mockReturnValue(shapeId)
-
-			const rect: Rect = rectFactory({ x: 10, y: 20, width: 30, height: 40 })
 			const prev0 = withHitTests(
 				editorStateFactory({
-					doc: {
-						...editorStateFactory().doc,
-						shapes: new Map([[shapeId, rect]]),
+					session: {
+						...editorStateFactory().session,
+						latestPointer: { kind: "none" },
 					},
 				}),
 				0,
@@ -372,32 +308,96 @@ describe("pointerReducer", () => {
 			const armedRes = pointerReducer(prev0, down)
 			expect(armedRes.session.mode.kind).toBe("armed")
 
-			// within threshold: noop
-			const moveSmall = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(0, 3),
-			})
-			const resSmall = pointerReducer(
+			// still within threshold (<=3): sample + tick => noop
+			const afterSmallMove = pointerReducer(
 				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
-				moveSmall,
+				move(createPointerId("p1"), createPoint(3, 0)),
 			)
-			expect(resSmall.session).toBe(armedRes.session)
-			expect(resSmall.actions).toEqual([])
+			const resSmallTick = pointerReducer(
+				{
+					...prev0,
+					session: afterSmallMove.session,
+					debug: afterSmallMove.debug,
+				},
+				frameTick(),
+			)
+			expect(resSmallTick.session.mode).toEqual(armedRes.session.mode)
+			expect(resSmallTick.actions).toEqual([])
 
-			// exceeds threshold: starts dragging (still no actions)
-			const moveBig = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(0, 4),
-			})
-			const resBig = pointerReducer(
+			// exceeds threshold: sample + tick => drawingRect
+			const afterBigMove = pointerReducer(
 				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
-				moveBig,
+				move(createPointerId("p1"), createPoint(4, 0)),
+			)
+			const resBigTick = pointerReducer(
+				{ ...prev0, session: afterBigMove.session, debug: afterBigMove.debug },
+				frameTick(),
 			)
 
-			expect(resBig.actions).toEqual([])
-			expect(resBig.session.mode).toEqual({
+			expect(resBigTick.actions).toEqual([])
+			expect(resBigTick.session.mode).toEqual({
+				kind: "drawingRect",
+				pointerId: createPointerId("p1"),
+				origin: createPoint(0, 0),
+				current: createPoint(4, 0),
+			})
+		})
+
+		it("armed dragSelection: stays armed until MIN_DRAG exceeded, then enters draggingSelection", () => {
+			const shapeId = createShapeId("shape-1")
+			hitTestMock.mockReturnValue(shapeId)
+
+			const rect: Rect = rectFactory({ x: 10, y: 20, width: 30, height: 40 })
+			const prev0 = withHitTests(
+				editorStateFactory({
+					doc: {
+						...editorStateFactory().doc,
+						shapes: new Map([[shapeId, rect]]),
+					},
+					session: {
+						...editorStateFactory().session,
+						latestPointer: { kind: "none" },
+					},
+				}),
+				0,
+			)
+
+			const down = pointerEventFactory({
+				type: "POINTER_DOWN",
+				pointerId: createPointerId("p1"),
+				position: createPoint(0, 0),
+			})
+			const armedRes = pointerReducer(prev0, down)
+			expect(armedRes.session.mode.kind).toBe("armed")
+
+			// within threshold
+			const afterSmallMove = pointerReducer(
+				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				move(createPointerId("p1"), createPoint(0, 3)),
+			)
+			const smallTick = pointerReducer(
+				{
+					...prev0,
+					session: afterSmallMove.session,
+					debug: afterSmallMove.debug,
+				},
+				frameTick(),
+			)
+			expect(smallTick.session.mode).toEqual(armedRes.session.mode)
+			expect(smallTick.actions).toEqual([])
+
+			// exceeds threshold: starts dragging
+			const afterBigMove = pointerReducer(
+				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				move(createPointerId("p1"), createPoint(0, 4)),
+			)
+			const bigTick = pointerReducer(
+				{ ...prev0, session: afterBigMove.session, debug: afterBigMove.debug },
+				frameTick(),
+			)
+
+			expect(bigTick.actions).toEqual([])
+			expect(bigTick.session.mode).toEqual({
 				kind: "draggingSelection",
 				shapeId,
 				pointerId: createPointerId("p1"),
@@ -407,9 +407,10 @@ describe("pointerReducer", () => {
 			})
 		})
 
-		it("draggingSelection: updates currentPointer (no hitTest, no actions)", () => {
+		it("draggingSelection: updates currentPointer from latestPointer (no hitTest, no actions)", () => {
 			const shapeId = createShapeId("shape-1")
-			const prev = editorStateFactory({
+
+			const prev0 = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					mode: {
@@ -420,27 +421,29 @@ describe("pointerReducer", () => {
 						currentPointer: createPoint(10, 10),
 						startRect: rectFactory({ x: 1, y: 2, width: 3, height: 4 }),
 					},
+					latestPointer: { kind: "none" },
 				},
 			})
 
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(15, 5),
-			})
-
-			const res = pointerReducer(prev, event)
+			const afterMove = pointerReducer(
+				prev0,
+				move(createPointerId("p1"), createPoint(15, 5)),
+			)
+			const res = pointerReducer(
+				{ ...prev0, session: afterMove.session, debug: afterMove.debug },
+				frameTick(),
+			)
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.actions).toEqual([])
 			expect(res.session.mode).toEqual({
-				...(prev.session.mode as any),
+				...(prev0.session.mode as any),
 				currentPointer: createPoint(15, 5),
 			})
 		})
 
-		it("drawingRect: updates current for matching pointerId and does not hitTest", () => {
-			const prev = editorStateFactory({
+		it("drawingRect: updates current from latestPointer and does not hitTest", () => {
+			const prev0 = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					mode: {
@@ -450,16 +453,18 @@ describe("pointerReducer", () => {
 						current: createPoint(1, 1),
 					},
 					hover: { kind: "shape", id: createShapeId("shape-1") },
+					latestPointer: { kind: "none" },
 				},
 			})
 
-			const event = pointerEventFactory({
-				type: "POINTER_MOVE",
-				pointerId: createPointerId("p1"),
-				position: createPoint(9, 9),
-			})
-
-			const res = pointerReducer(prev, event)
+			const afterMove = pointerReducer(
+				prev0,
+				move(createPointerId("p1"), createPoint(9, 9)),
+			)
+			const res = pointerReducer(
+				{ ...prev0, session: afterMove.session, debug: afterMove.debug },
+				frameTick(),
+			)
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.actions).toEqual([])
@@ -469,11 +474,11 @@ describe("pointerReducer", () => {
 				origin: createPoint(0, 0),
 				current: createPoint(9, 9),
 			})
-			expect(res.session.hover).toEqual(prev.session.hover)
+			expect(res.session.hover).toEqual(prev0.session.hover)
 		})
 	})
 
-	describe("POINTER_UP", () => {
+	describe("POINTER_UP (commit uses bestPointerPosition)", () => {
 		it("armed: returns to idle and emits no actions (matching pointerId)", () => {
 			const prev = editorStateFactory({
 				session: {
@@ -484,6 +489,7 @@ describe("pointerReducer", () => {
 						origin: createPoint(0, 0),
 						intent: { kind: "drawRect" },
 					},
+					latestPointer: { kind: "none" },
 				},
 			})
 
@@ -499,7 +505,7 @@ describe("pointerReducer", () => {
 			expect(res.session.mode).toEqual({ kind: "idle" })
 		})
 
-		it("drawingRect: ends drawing, returns idle, and emits createAddRect(origin, position)", () => {
+		it("drawingRect: uses latestPointer position if present for same pointerId", () => {
 			const addAction = { type: "ADD_RECT" } as unknown as DocAction
 			createAddRectMock.mockReturnValue(addAction)
 
@@ -511,6 +517,11 @@ describe("pointerReducer", () => {
 						pointerId: createPointerId("p1"),
 						origin: createPoint(0, 0),
 						current: createPoint(5, 5),
+					},
+					latestPointer: {
+						kind: "some",
+						pointerId: createPointerId("p1"),
+						position: createPoint(99, 99),
 					},
 				},
 			})
@@ -525,13 +536,13 @@ describe("pointerReducer", () => {
 
 			expect(createAddRectMock).toHaveBeenCalledWith(
 				createPoint(0, 0),
-				createPoint(5, 5),
+				createPoint(99, 99),
 			)
 			expect(res.actions).toEqual([addAction])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 		})
 
-		it("draggingSelection: ends drag, returns idle, and emits createUpdateRectPosition(doc, shapeId, pos) if action exists", () => {
+		it("draggingSelection: emits createUpdateRectPosition(doc, shapeId, pos) using bestPointerPosition", () => {
 			const shapeId = createShapeId("shape-1")
 			const startRect = rectFactory({ x: 1, y: 2, width: 3, height: 4 })
 
@@ -550,13 +561,19 @@ describe("pointerReducer", () => {
 						startRect,
 					},
 					selection: { kind: "shape", id: shapeId },
+					latestPointer: {
+						kind: "some",
+						pointerId: createPointerId("p1"),
+						position: createPoint(15, 5),
+					},
 				},
 			})
 
+			// event.position differs; reducer should prefer latestPointer
 			const event = pointerEventFactory({
 				type: "POINTER_UP",
 				pointerId: createPointerId("p1"),
-				position: createPoint(15, 5),
+				position: createPoint(999, 999),
 			})
 
 			const res = pointerReducer(prev, event)
@@ -565,10 +582,7 @@ describe("pointerReducer", () => {
 			expect(createUpdateRectPositionMock).toHaveBeenCalledWith(
 				prev.doc,
 				shapeId,
-				{
-					x: 6,
-					y: -3,
-				},
+				{ x: 6, y: -3 },
 			)
 			expect(res.actions).toEqual([updateAction])
 			expect(res.session.mode).toEqual({ kind: "idle" })
@@ -589,6 +603,11 @@ describe("pointerReducer", () => {
 						startPointer: createPoint(0, 0),
 						currentPointer: createPoint(0, 0),
 						startRect: rectFactory({ x: 10, y: 20, width: 1, height: 1 }),
+					},
+					latestPointer: {
+						kind: "some",
+						pointerId: createPointerId("p1"),
+						position: createPoint(0, 10),
 					},
 				},
 			})
@@ -613,6 +632,7 @@ describe("pointerReducer", () => {
 					...editorStateFactory().session,
 					mode: { kind: "idle" },
 					hover: { kind: "shape", id: createShapeId("shape-1") },
+					latestPointer: { kind: "none" },
 				},
 			})
 
@@ -640,6 +660,7 @@ describe("pointerReducer", () => {
 						current: createPoint(5, 5),
 					},
 					hover: { kind: "shape", id: createShapeId("shape-1") },
+					latestPointer: { kind: "none" },
 				},
 			})
 
@@ -660,7 +681,7 @@ describe("pointerReducer", () => {
 	describe("unknown event type", () => {
 		it("noops", () => {
 			const prev = editorStateFactory()
-			const event = { type: "SOMETHING_ELSE" } as unknown as PointerEditorEvent
+			const event = { type: "SOMETHING_ELSE" } as unknown as EditorEvent
 
 			const res = pointerReducer(prev, event)
 			expect(res.session).toBe(prev.session)
