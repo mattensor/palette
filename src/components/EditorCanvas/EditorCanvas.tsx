@@ -2,6 +2,7 @@ import type { KeyboardEvent, PointerEvent } from "react"
 import { useEffect, useRef, useState } from "react"
 import { CanvasArea } from "@/components/CanvasArea"
 import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
+import { coalesceMoveEvents } from "@/components/EditorCanvas/helpers/coalesceMoveEvents"
 import { normaliseKeyboardEvent } from "@/components/EditorCanvas/helpers/normaliseKeyboardEvent"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
@@ -72,7 +73,10 @@ export function EditorCanvas() {
 		const eventsToProcess = eventQueueRef.current
 		eventQueueRef.current = []
 
-		for (const event of eventsToProcess) {
+		const { events, movesDropped, movesKept, queueLength } =
+			coalesceMoveEvents(eventsToProcess)
+
+		for (const event of events) {
 			const prev = editorStateRef.current
 			editorStateRef.current = reducer(prev, event)
 		}
@@ -91,9 +95,11 @@ export function EditorCanvas() {
 		const after = performance.now()
 
 		// mutate in place to avoid updating editor state every frame
-		editorStateRef.current.debug.metrics.lastRenderMs = after - before
-		editorStateRef.current.debug.metrics.eventsProcessed =
-			eventsToProcess.length
+		const metrics = editorStateRef.current.debug.metrics
+		metrics.lastRenderMs = after - before
+		metrics.movesDropped = movesDropped
+		metrics.movesKept = movesKept
+		metrics.queueLength = queueLength
 	}
 
 	function scheduleFrame() {

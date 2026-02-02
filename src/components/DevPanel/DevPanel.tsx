@@ -75,8 +75,14 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 				<div>lastRenderMs</div>
 				<div>{formatMs(metrics.lastRenderMs)}</div>
 
-				<div>eventsProcessed</div>
-				<div>{metrics.eventsProcessed}</div>
+				<div>queueLength</div>
+				<div>{metrics.queueLength}</div>
+
+				<div>movesDropped</div>
+				<div>{metrics.movesDropped}</div>
+
+				<div>movesKept</div>
+				<div>{metrics.movesKept}</div>
 
 				<div>hitTests</div>
 				<div>{metrics.hitTests}</div>
