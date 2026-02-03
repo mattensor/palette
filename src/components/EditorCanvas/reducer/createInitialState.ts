@@ -18,10 +18,14 @@ export function createInitialState(): EditorState {
 		},
 		debug: {
 			metrics: {
-				lastRenderMs: null,
-				shapeCount: 0,
-				eventsProcessed: 0,
+				frameMsAvg: null,
+				hitTestMsLast: null,
 				hitTests: 0,
+				lastRenderMs: null,
+				movesDropped: 0,
+				movesKept: 0,
+				queueLength: 0,
+				shapeCount: 0,
 			},
 			historyInfo: {
 				depth: 0,
@@ -29,10 +33,6 @@ export function createInitialState(): EditorState {
 				canUndo: false,
 			},
 			devLog: [],
-		},
-		frameInput: {
-			latestPointerById: new Map(),
-			lastFrameTs: null,
 		},
 	}
 }

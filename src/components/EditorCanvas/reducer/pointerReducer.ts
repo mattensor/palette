@@ -79,7 +79,7 @@ function hitTest(
 	prev: EditorState,
 	position: CanvasPoint,
 ): { hitShapeId: ShapeId | null; debug: DebugState } {
-	const hitShapeId = hitTestTopmostShape(prev.doc, position)
+	const hitShapeId = hitTestTopmostShape(prev, position)
 	return { hitShapeId, debug: incHitTests(prev.debug) }
 }
 

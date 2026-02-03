@@ -75,6 +75,9 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 				<div>lastRenderMs</div>
 				<div>{formatMs(metrics.lastRenderMs)}</div>
 
+				<div>frameMsAvg</div>
+				<div>{formatMs(metrics.frameMsAvg)}</div>
+
 				<div>queueLength</div>
 				<div>{metrics.queueLength}</div>
 
@@ -86,9 +89,11 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 
 				<div>hitTests</div>
 				<div>{metrics.hitTests}</div>
+
+				<div>hitTestMsLast</div>
+				<div>{formatMs(metrics.hitTestMsLast)}</div>
 			</div>
 
-			{/* NEW: Undo / Redo visibility */}
 			<div className={styles.sectionTitle}>history</div>
 
 			<div className={styles.grid}>

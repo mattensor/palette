@@ -5,13 +5,25 @@ import { docFactory } from "@/factories/docFactory"
 import { rectFactory } from "@/factories/rectFactory"
 import { hitTestTopmostShape, pointInRect } from "../hitTest"
 
+// Minimal state helper for hit testing
+function makeState(doc: ReturnType<typeof docFactory>) {
+	return {
+		doc,
+		debug: {
+			metrics: {
+				hitTestMsLast: null,
+				hitTests: 0,
+			},
+		},
+	} as any // keep minimal; avoid pulling full EditorState factory if you don't have one
+}
+
 describe("pointInRect", () => {
 	const rect = rectFactory({ x: 0, y: 0, width: 50, height: 50 })
 
 	describe("when the point is inside the shape", () => {
 		test("returns true", () => {
 			const point = canvasPointFactory({ x: 25, y: 25 })
-
 			expect(pointInRect(rect, point)).toBe(true)
 		})
 	})
@@ -19,7 +31,6 @@ describe("pointInRect", () => {
 	describe("when the point is outside the shape", () => {
 		test("returns false", () => {
 			const point = canvasPointFactory({ x: 75, y: 75 })
-
 			expect(pointInRect(rect, point)).toBe(false)
 		})
 	})
@@ -38,8 +49,14 @@ describe("hitTestTopmostShape", () => {
 		const shapeOrder = [firstRect.id, secondRect.id]
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns the topmost shape", () => {
-			expect(hitTestTopmostShape(doc, point)).toEqual(secondRect.id)
+		test("returns the topmost shape and records metrics", () => {
+			const state = makeState(doc)
+
+			expect(hitTestTopmostShape(state, point)).toEqual(secondRect.id)
+
+			expect(state.debug.metrics.hitTests).toBe(1)
+			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
+			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
 		})
 	})
 
@@ -48,8 +65,14 @@ describe("hitTestTopmostShape", () => {
 		const shapeOrder = [firstRect.id]
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns that shape", () => {
-			expect(hitTestTopmostShape(doc, point)).toEqual(firstRect.id)
+		test("returns that shape and records metrics", () => {
+			const state = makeState(doc)
+
+			expect(hitTestTopmostShape(state, point)).toEqual(firstRect.id)
+
+			expect(state.debug.metrics.hitTests).toBe(1)
+			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
+			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
 		})
 	})
 
@@ -58,8 +81,14 @@ describe("hitTestTopmostShape", () => {
 		const shapeOrder: ShapeId[] = []
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns null", () => {
-			expect(hitTestTopmostShape(doc, point)).toBeNull()
+		test("returns null and records metrics", () => {
+			const state = makeState(doc)
+
+			expect(hitTestTopmostShape(state, point)).toBeNull()
+
+			expect(state.debug.metrics.hitTests).toBe(1)
+			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
+			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
 		})
 	})
 })

@@ -3,12 +3,14 @@ import type { DocumentState } from "./domain"
 import type { SessionState } from "./interaction"
 
 export type Metrics = {
-	lastRenderMs: number | null
-	shapeCount: number
+	frameMsAvg: number | null
+	hitTestMsLast: number | null
 	hitTests: number
-	movesKept: number
+	lastRenderMs: number | null
 	movesDropped: number
+	movesKept: number
 	queueLength: number // raw input
+	shapeCount: number
 }
 
 export type HistoryInfo = {

@@ -68,6 +68,8 @@ export function EditorCanvas() {
 	}, [])
 
 	function processFrame() {
+		const frameStart = performance.now()
+
 		editorStateRef.current.debug.metrics.hitTests = 0
 
 		const eventsToProcess = eventQueueRef.current
@@ -90,16 +92,24 @@ export function EditorCanvas() {
 		const canvas = canvasRef.current
 		if (canvas == null) return
 
-		const before = performance.now()
+		const beforeRender = performance.now()
 		render(canvas, editorStateRef.current)
-		const after = performance.now()
+		const afterRender = performance.now()
 
-		// mutate in place to avoid updating editor state every frame
+		const frameEnd = performance.now()
+		const frameMsLast = frameEnd - frameStart
+
 		const metrics = editorStateRef.current.debug.metrics
-		metrics.lastRenderMs = after - before
+		metrics.lastRenderMs = afterRender - beforeRender
 		metrics.movesDropped = movesDropped
 		metrics.movesKept = movesKept
 		metrics.queueLength = queueLength
+
+		const alpha = 0.1
+		metrics.frameMsAvg =
+			metrics.frameMsAvg == null
+				? frameMsLast
+				: metrics.frameMsAvg + alpha * (frameMsLast - metrics.frameMsAvg)
 	}
 
 	function scheduleFrame() {

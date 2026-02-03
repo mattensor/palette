@@ -2,43 +2,46 @@
 
 ## Purpose
 
-Lightweight metrics used to validate early architectural decisions in the editor core.
+Lightweight metrics used to validate early architectural decisions in the editor core.  
 Metrics are sampled per animation frame and are intended for sanity-checking, not benchmarking.
 
 ---
 
 ## Input & Rendering
 
-### Events per frame (`eventsProcessed`)
+### Event batching (`queueLength`, `movesDropped`, `movesKept`)
 
 - **Observation:**  
-  Pointer and keyboard input can generate many events between animation frames.
+  Pointer and keyboard input can generate many events between animation frames, and pointer-move events can dominate the queue during interaction.
 
-- **Metric:**  
-  `eventsProcessed` - number of editor events reduced in a single frame.
+- **Metrics:**  
+  - `queueLength` — raw number of input events enqueued since the previous frame  
+  - `movesDropped` — number of pointer-move events discarded by coalescing  
+  - `movesKept` — number of pointer-move events retained by coalescing
 
 - **Target:**  
-  Multiple events per frame during interaction; render frequency remains aligned with the browser frame rate.
+  During active pointer interaction, `queueLength` may grow, while coalescing ensures that the number of events actually reduced per frame remains bounded and rendering stays aligned with the browser frame rate.
 
 - **Result:**  
-  Event batching reduces unnecessary renders while preserving interaction fidelity.
+  Coalescing reduces unnecessary reducer work and avoids excessive renders while preserving interaction fidelity.
 
 ---
 
-### Render cost (`lastRenderMs`, `shapeCount`)
+### Frame and render cost (`frameMsAvg`, `lastRenderMs`, `shapeCount`)
 
 - **Observation:**  
-  The editor performs a full canvas redraw each frame.
+  The editor performs a full canvas redraw each frame; overall responsiveness depends on the combined cost of event reduction, hit-testing (when applicable), and rendering.
 
 - **Metrics:**  
-  - `lastRenderMs` - time spent rendering the canvas  
-  - `shapeCount` - number of rendered shapes
+  - `frameMsAvg` — exponential moving average of total frame processing time  
+  - `lastRenderMs` — time spent rendering the canvas (single frame)  
+  - `shapeCount` — number of rendered shapes
 
 - **Target:**  
-  Render time remains comfortably under the frame budget at current shape counts.
+  `frameMsAvg` remains comfortably under the frame budget at current `shapeCount`, and `lastRenderMs` stays low enough that non-render work does not cause jank.
 
 - **Result:**  
-  Full redraw rendering is acceptable for the current scope.
+  Full redraw rendering is acceptable for the current scope, and frame-time smoothing provides a stable signal for regressions.
 
 ---
 
@@ -57,21 +60,23 @@ Metrics are sampled per animation frame and are intended for sanity-checking, no
 
 ---
 
-### Hit-testing (`hitTests`, `shapeCount`)
+### Hit-testing cost (`hitTests`, `hitTestMsLast`, `shapeCount`)
 
 - **Observation:**  
-  Hit-testing is performed on pointer down (intent resolution) and on pointer move while idle (hover).
+  Hit-testing is performed on pointer down (intent resolution) and on pointer move while idle (hover).  
   Drag interactions do not perform hit-testing.
 
 - **Metrics:**  
-  - `hitTests` - number of hit-tests performed per frame  
-  - `shapeCount` - number of shapes scanned during hit-testing
+  - `hitTests` — number of hit-tests performed per frame  
+  - `hitTestMsLast` — time spent in the most recent hit-test  
+  - `shapeCount` — number of shapes rendered (and an upper bound on scan work)
 
 - **Target:**  
-  Linear hit-testing remains cheap at current shape counts and does not impact frame time.
+  Hit-testing remains cheap at current `shapeCount` and does not materially affect `frameMsAvg`.  
+  `hitTestMsLast` should stay low and scale roughly linearly with shape count.
 
 - **Result:**  
-  No hit-testing related performance issues observed.
+  No hit-testing related performance issues observed; timing visibility helps isolate regressions when hover or selection begins to cost more than expected.
 
 ---
 
