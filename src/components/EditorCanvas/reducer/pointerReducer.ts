@@ -1,50 +1,49 @@
 import { hitTestTopmostShape } from "@/components/EditorCanvas/helpers/hitTest"
 import { createAddRect } from "@/components/EditorCanvas/reducer/actions/createAddRect"
 import { createUpdateRectPosition } from "@/components/EditorCanvas/reducer/actions/createUpdateRectPosition"
-
 import type {
-	CanvasPoint,
-	DebugState,
-	DocAction,
-	DocumentState,
 	EditorEvent,
 	EditorState,
 	PointerEditorEvent,
+	SessionState,
+} from "@/components/EditorCanvas/types"
+import type {
+	CanvasPoint,
+	DocumentState,
 	PointerId,
 	Rect,
-	SessionState,
 	ShapeId,
-} from "@/components/EditorCanvas/types"
+} from "@/components/EditorCanvas/types/domain" // adjust if these live elsewhere
+import type { PerfEvent } from "@/components/EditorCanvas/types/perf"
+import type { InteractionResult } from "./types"
 
-type PointerResult = {
-	session: SessionState
-	debug: DebugState
-	actions: DocAction[]
+/** ---------- result helper ---------- */
+
+function noop(prev: EditorState): InteractionResult {
+	return { session: prev.session, actions: [], perf: [] }
 }
 
-/** ---------- tiny helpers: return shapes ---------- */
-
-function noop(prev: EditorState): PointerResult {
-	return { session: prev.session, debug: prev.debug, actions: [] }
+function setMode(
+	prev: EditorState,
+	mode: SessionState["mode"],
+): InteractionResult {
+	return { session: { ...prev.session, mode }, actions: [], perf: [] }
 }
 
-function setMode(prev: EditorState, mode: SessionState["mode"]): PointerResult {
-	return { session: { ...prev.session, mode }, debug: prev.debug, actions: [] }
-}
-
-function toIdle(prev: EditorState): PointerResult {
+function toIdle(prev: EditorState): InteractionResult {
 	return setMode(prev, { kind: "idle" })
 }
 
-function cancelToIdle(prev: EditorState): PointerResult {
+function cancelToIdle(prev: EditorState): InteractionResult {
 	return {
 		session: {
 			...prev.session,
 			mode: { kind: "idle" },
 			hover: { kind: "none" },
+			latestPointer: { kind: "none" },
 		},
-		debug: prev.debug,
 		actions: [],
+		perf: [],
 	}
 }
 
@@ -66,53 +65,7 @@ function translateRect(
 	return { x: rect.x + d.dx, y: rect.y + d.dy }
 }
 
-/** ---------- hit testing + hover (with metrics) ---------- */
-
-function incHitTests(debug: DebugState): DebugState {
-	return {
-		...debug,
-		metrics: { ...debug.metrics, hitTests: debug.metrics.hitTests + 1 },
-	}
-}
-
-function hitTest(
-	prev: EditorState,
-	position: CanvasPoint,
-): { hitShapeId: ShapeId | null; debug: DebugState } {
-	const hitShapeId = hitTestTopmostShape(prev, position)
-	return { hitShapeId, debug: incHitTests(prev.debug) }
-}
-
-function updateHover(
-	prev: EditorState,
-	hitShapeId: ShapeId | null,
-	debug: DebugState,
-): PointerResult {
-	// no hit
-	if (hitShapeId == null) {
-		if (prev.session.hover.kind === "none") return { ...noop(prev), debug }
-		return {
-			session: { ...prev.session, hover: { kind: "none" } },
-			debug,
-			actions: [],
-		}
-	}
-
-	// hit same
-	if (
-		prev.session.hover.kind === "shape" &&
-		prev.session.hover.id === hitShapeId
-	) {
-		return { ...noop(prev), debug }
-	}
-
-	// new hit
-	return {
-		session: { ...prev.session, hover: { kind: "shape", id: hitShapeId } },
-		debug,
-		actions: [],
-	}
-}
+/** ---------- doc helpers ---------- */
 
 function getRect(doc: DocumentState, id: ShapeId): Rect | null {
 	return doc.shapes.get(id) ?? null
@@ -130,16 +83,58 @@ function bestPointerPosition(
 		: fallback
 }
 
+/** ---------- hit testing (perf events) ---------- */
+
+function hitTest(
+	prev: EditorState,
+	position: CanvasPoint,
+): { hitShapeId: ShapeId | null; perf: PerfEvent } {
+	const t0 = performance.now()
+	const hitShapeId = hitTestTopmostShape(prev.doc, position)
+	const ms = performance.now() - t0
+	return { hitShapeId, perf: { type: "HIT_TEST", ms } }
+}
+
+function updateHover(
+	prev: EditorState,
+	hitShapeId: ShapeId | null,
+): InteractionResult {
+	// no hit
+	if (hitShapeId == null) {
+		if (prev.session.hover.kind === "none") return noop(prev)
+		return {
+			session: { ...prev.session, hover: { kind: "none" } },
+			actions: [],
+			perf: [],
+		}
+	}
+
+	// hit same
+	if (
+		prev.session.hover.kind === "shape" &&
+		prev.session.hover.id === hitShapeId
+	) {
+		return noop(prev)
+	}
+
+	// new hit
+	return {
+		session: { ...prev.session, hover: { kind: "shape", id: hitShapeId } },
+		actions: [],
+		perf: [],
+	}
+}
+
 /** ---------- event handlers ---------- */
 
 function onPointerDown(
 	prev: EditorState,
 	event: PointerEditorEvent,
-): PointerResult {
+): InteractionResult {
 	// Only meaningful from idle.
 	if (prev.session.mode.kind !== "idle") return noop(prev)
 
-	const { hitShapeId, debug } = hitTest(prev, event.position)
+	const { hitShapeId, perf } = hitTest(prev, event.position)
 
 	// empty space => arm draw
 	if (hitShapeId == null) {
@@ -155,14 +150,16 @@ function onPointerDown(
 				hover: { kind: "none" },
 				selection: { kind: "none" },
 			},
-			debug,
 			actions: [],
+			perf: [perf],
 		}
 	}
 
 	// shape => arm drag (only if rect exists)
 	const rect = getRect(prev.doc, hitShapeId)
-	if (!rect) return { ...noop(prev), debug }
+	if (!rect) {
+		return { ...noop(prev), perf: [perf] }
+	}
 
 	return {
 		session: {
@@ -181,8 +178,8 @@ function onPointerDown(
 			hover: { kind: "none" },
 			selection: { kind: "shape", id: hitShapeId },
 		},
-		debug,
 		actions: [],
+		perf: [perf],
 	}
 }
 
@@ -193,7 +190,7 @@ function onPointerDown(
 function onPointerMove(
 	prev: EditorState,
 	event: PointerEditorEvent,
-): PointerResult {
+): InteractionResult {
 	return {
 		session: {
 			...prev.session,
@@ -203,8 +200,8 @@ function onPointerMove(
 				position: event.position,
 			},
 		},
-		debug: prev.debug,
 		actions: [],
+		perf: [],
 	}
 }
 
@@ -214,7 +211,7 @@ function onPointerMove(
  * - armed: threshold -> transition to drawing/dragging
  * - dragging/drawing: update preview
  */
-function onFrameTick(prev: EditorState): PointerResult {
+function onFrameTick(prev: EditorState): InteractionResult {
 	const lp = prev.session.latestPointer
 	if (lp.kind !== "some") return noop(prev)
 
@@ -223,8 +220,13 @@ function onFrameTick(prev: EditorState): PointerResult {
 
 	switch (mode.kind) {
 		case "idle": {
-			const { hitShapeId, debug } = hitTest(prev, position)
-			return updateHover(prev, hitShapeId, debug)
+			const { hitShapeId, perf } = hitTest(prev, position)
+			const hoverResult = updateHover(prev, hitShapeId)
+			return {
+				session: hoverResult.session,
+				actions: hoverResult.actions,
+				perf: [perf, ...hoverResult.perf],
+			}
 		}
 
 		case "armed": {
@@ -269,7 +271,7 @@ function onFrameTick(prev: EditorState): PointerResult {
 function onPointerUp(
 	prev: EditorState,
 	event: PointerEditorEvent,
-): PointerResult {
+): InteractionResult {
 	const mode = prev.session.mode
 
 	switch (mode.kind) {
@@ -284,12 +286,13 @@ function onPointerUp(
 			const end = bestPointerPosition(prev, event.pointerId, event.position)
 			const d = delta(mode.startPointer, end)
 			const pos = translateRect(mode.startRect, d)
+
 			const action = createUpdateRectPosition(prev.doc, mode.shapeId, pos)
 
 			return {
 				session: { ...prev.session, mode: { kind: "idle" } },
-				debug: prev.debug,
 				actions: action ? [action] : [],
+				perf: [],
 			}
 		}
 
@@ -300,8 +303,8 @@ function onPointerUp(
 
 			return {
 				session: { ...prev.session, mode: { kind: "idle" } },
-				debug: prev.debug,
 				actions: [createAddRect(mode.origin, end)],
+				perf: [],
 			}
 		}
 
@@ -313,7 +316,7 @@ function onPointerUp(
 function onPointerCancel(
 	prev: EditorState,
 	event: PointerEditorEvent,
-): PointerResult {
+): InteractionResult {
 	const mode = prev.session.mode
 
 	// idle cancels always clear hover
@@ -331,7 +334,7 @@ function onPointerCancel(
 export function pointerReducer(
 	prev: EditorState,
 	event: EditorEvent,
-): PointerResult {
+): InteractionResult {
 	switch (event.type) {
 		case "POINTER_DOWN":
 			return onPointerDown(prev, event)

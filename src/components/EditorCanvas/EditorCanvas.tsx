@@ -4,9 +4,11 @@ import { CanvasArea } from "@/components/CanvasArea"
 import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
 import { coalesceMoveEvents } from "@/components/EditorCanvas/helpers/coalesceMoveEvents"
 import { normaliseKeyboardEvent } from "@/components/EditorCanvas/helpers/normaliseKeyboardEvent"
+import { editorReducer } from "@/components/EditorCanvas/reducer"
+import { createInitialState } from "@/components/EditorCanvas/reducer/createInitialState"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
+import { createDebugRecorder } from "./debug/createDebugRecorder"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
-import { createInitialState, reducer } from "./reducer"
 import { render } from "./render"
 import styles from "./styles.module.css"
 
@@ -17,20 +19,20 @@ export function EditorCanvas() {
 	const eventQueueRef = useRef<EditorEvent[]>([])
 	const frameScheduledRef = useRef(false)
 
-	const editorStateRef = useRef(createInitialState())
+	const coreRef = useRef(createInitialState())
+	const debugRecorderRef = useRef(createDebugRecorder())
 
 	const [debugSnapshot, setDebugSnapshot] = useState<DebugSnapshot>(() => ({
-		mode: editorStateRef.current.session.mode,
-		debug: editorStateRef.current.debug,
+		mode: coreRef.current.session.mode,
+		debug: debugRecorderRef.current.snapshot(coreRef.current),
 	}))
 
 	useEffect(() => {
 		const id = window.setInterval(() => {
-			const s = editorStateRef.current
-			// Shallow snapshot is enough since we're replacing state in the reducer.
+			const core = coreRef.current
 			setDebugSnapshot({
-				mode: s.session.mode,
-				debug: s.debug,
+				mode: core.session.mode,
+				debug: debugRecorderRef.current.snapshot(core),
 			})
 		}, 100)
 
@@ -49,28 +51,26 @@ export function EditorCanvas() {
 			if (context == null) return
 
 			const canvasRectangle = canvas.getBoundingClientRect()
-
 			const devicePixelRatio = window.devicePixelRatio || 1
+
 			canvas.width = Math.floor(canvasRectangle.width * devicePixelRatio)
 			canvas.height = Math.floor(canvasRectangle.height * devicePixelRatio)
 
 			context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
-			render(canvas, editorStateRef.current)
+			render(canvas, coreRef.current)
 		}
 
 		const resizeObserver = new ResizeObserver(onResize)
-
 		resizeObserver.observe(host)
 
-		return () => {
-			resizeObserver.disconnect()
-		}
+		return () => resizeObserver.disconnect()
 	}, [])
 
 	function processFrame() {
 		const frameStart = performance.now()
+		const recorder = debugRecorderRef.current
 
-		editorStateRef.current.debug.metrics.hitTests = 0
+		recorder.beginFrame()
 
 		const eventsToProcess = eventQueueRef.current
 		eventQueueRef.current = []
@@ -78,43 +78,49 @@ export function EditorCanvas() {
 		const { events, movesDropped, movesKept, queueLength } =
 			coalesceMoveEvents(eventsToProcess)
 
+		recorder.recordMoveCoalesce({
+			dropped: movesDropped,
+			kept: movesKept,
+			queueLength,
+		})
+
+		// process input events
 		for (const event of events) {
-			const prev = editorStateRef.current
-			editorStateRef.current = reducer(prev, event)
+			const prev = coreRef.current
+			const { next, actions, perf } = editorReducer(prev, event)
+			coreRef.current = next
+
+			recorder.recordPerf(perf)
+			recorder.recordTransition({ prev, next, actions })
 		}
 
-		const prev = editorStateRef.current
-		editorStateRef.current = reducer(prev, {
+		// always do a frame tick
+
+		const prev = coreRef.current
+		const { next, actions, perf } = editorReducer(prev, {
 			type: "FRAME_TICK",
 			now: performance.now(),
 		})
+		coreRef.current = next
+
+		recorder.recordPerf(perf)
+		recorder.recordTransition({ prev, next, actions })
 
 		const canvas = canvasRef.current
 		if (canvas == null) return
 
 		const beforeRender = performance.now()
-		render(canvas, editorStateRef.current)
+		render(canvas, coreRef.current)
 		const afterRender = performance.now()
 
+		recorder.recordRender(afterRender - beforeRender)
+
 		const frameEnd = performance.now()
-		const frameMsLast = frameEnd - frameStart
-
-		const metrics = editorStateRef.current.debug.metrics
-		metrics.lastRenderMs = afterRender - beforeRender
-		metrics.movesDropped = movesDropped
-		metrics.movesKept = movesKept
-		metrics.queueLength = queueLength
-
-		const alpha = 0.1
-		metrics.frameMsAvg =
-			metrics.frameMsAvg == null
-				? frameMsLast
-				: metrics.frameMsAvg + alpha * (frameMsLast - metrics.frameMsAvg)
+		recorder.endFrame(frameEnd - frameStart)
 	}
 
 	function scheduleFrame() {
 		if (frameScheduledRef.current === true) return
-
 		frameScheduledRef.current = true
 
 		requestAnimationFrame(() => {
@@ -122,10 +128,7 @@ export function EditorCanvas() {
 				processFrame()
 			} finally {
 				frameScheduledRef.current = false
-
-				if (eventQueueRef.current.length > 0) {
-					scheduleFrame()
-				}
+				if (eventQueueRef.current.length > 0) scheduleFrame()
 			}
 		})
 	}
@@ -138,7 +141,6 @@ export function EditorCanvas() {
 	function handlePointerEvent(event: PointerEvent<HTMLCanvasElement>) {
 		const canvas = canvasRef.current
 		if (canvas == null) return
-
 		const editorEvent = normalisePointerEvent(event, canvas)
 		enqueueEvent(editorEvent)
 	}
@@ -163,7 +165,6 @@ export function EditorCanvas() {
 	function handleKeyDown(e: KeyboardEvent<HTMLCanvasElement>) {
 		const canvas = canvasRef.current
 		if (canvas == null) return
-
 		const editorEvent = normaliseKeyboardEvent(e)
 		if (editorEvent) enqueueEvent(editorEvent)
 	}

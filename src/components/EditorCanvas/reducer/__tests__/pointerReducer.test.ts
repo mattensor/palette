@@ -41,22 +41,6 @@ const createPointerId = (s: string) => s as unknown as PointerId
 const createShapeId = (s: string) => s as ShapeId
 const createPoint = (x: number, y: number): CanvasPoint => ({ x, y })
 
-function withHitTests(
-	prev: ReturnType<typeof editorStateFactory>,
-	hitTests: number,
-) {
-	return {
-		...prev,
-		debug: {
-			...prev.debug,
-			metrics: {
-				...prev.debug.metrics,
-				hitTests,
-			},
-		},
-	}
-}
-
 function frameTick(now = 123): EditorEvent {
 	return { type: "FRAME_TICK", now } as EditorEvent
 }
@@ -67,6 +51,15 @@ function move(pointerId: PointerId, position: CanvasPoint): PointerEditorEvent {
 		pointerId,
 		position,
 	})
+}
+
+function expectHitTestPerf(perf: unknown) {
+	// supports both shapes:
+	//  - { type: "HIT_TEST" }
+	//  - { type: "HIT_TEST", ms: number }
+	expect(perf).toEqual(
+		expect.arrayContaining([expect.objectContaining({ type: "HIT_TEST" })]),
+	)
 }
 
 describe("pointerReducer (FRAME_TICK model)", () => {
@@ -102,8 +95,8 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.session).toBe(prev.session)
-			expect(res.debug).toBe(prev.debug)
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 		})
 
 		it("arms dragSelection + selects shape when clicking on a shape (hitTest returns id)", () => {
@@ -111,13 +104,12 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			hitTestMock.mockReturnValue(shapeId)
 
 			const rect: Rect = rectFactory({ x: 10, y: 20, width: 30, height: 40 })
-			const prev0 = editorStateFactory({
+			const prev = editorStateFactory({
 				doc: {
 					...editorStateFactory().doc,
 					shapes: new Map([[shapeId, rect]]),
 				},
 			})
-			const prev = withHitTests(prev0, 0)
 
 			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
@@ -129,7 +121,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			expect(hitTestMock).toHaveBeenCalledWith(prev.doc, event.position)
 			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(1)
+			expectHitTestPerf(res.perf)
 
 			expect(res.session.selection).toEqual({ kind: "shape", id: shapeId })
 			expect(res.session.hover).toEqual({ kind: "none" })
@@ -149,7 +141,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 		it("arms drawRect when clicking empty canvas, clears hover and selection", () => {
 			hitTestMock.mockReturnValue(null)
 
-			const prev0 = editorStateFactory({
+			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					hover: { kind: "shape", id: createShapeId("old-hover") },
@@ -157,7 +149,6 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 					latestPointer: { kind: "none" },
 				},
 			})
-			const prev = withHitTests(prev0, 7)
 
 			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
@@ -168,7 +159,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(8)
+			expectHitTestPerf(res.perf)
 
 			expect(res.session.mode).toEqual({
 				kind: "armed",
@@ -180,12 +171,11 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			expect(res.session.selection).toEqual({ kind: "none" })
 		})
 
-		it("if hitTest returns id but rect cannot be resolved: noop session but hitTests still increments", () => {
+		it("if hitTest returns id but rect cannot be resolved: noop session but still emits HIT_TEST perf", () => {
 			const shapeId = createShapeId("shape-1")
 			hitTestMock.mockReturnValue(shapeId)
 
-			const prev0 = editorStateFactory() // no shapes in doc
-			const prev = withHitTests(prev0, 2)
+			const prev = editorStateFactory() // no shapes in doc
 
 			const event = pointerEventFactory({
 				type: "POINTER_DOWN",
@@ -197,7 +187,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			expect(res.session).toBe(prev.session)
 			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(3)
+			expectHitTestPerf(res.perf)
 		})
 	})
 
@@ -213,12 +203,11 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			})
 
 			const event = move(createPointerId("p1"), createPoint(5, 5))
-
 			const res = pointerReducer(prev, event)
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.actions).toEqual([])
-			expect(res.debug).toBe(prev.debug)
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.latestPointer).toEqual({
 				kind: "some",
@@ -229,17 +218,16 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 	})
 
 	describe("FRAME_TICK", () => {
-		it("idle: hitTests and sets hover to shape when hitTest returns shape", () => {
+		it("idle: emits HIT_TEST perf and sets hover to shape when hitTest returns shape", () => {
 			const shapeId = createShapeId("shape-1")
 			hitTestMock.mockReturnValue(shapeId)
 
-			const prev0 = editorStateFactory({
+			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					latestPointer: { kind: "none" },
 				},
 			})
-			const prev = withHitTests(prev0, 0)
 
 			// sample pointer
 			const afterMove = pointerReducer(
@@ -248,13 +236,13 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			)
 
 			const res = pointerReducer(
-				{ ...prev, session: afterMove.session, debug: afterMove.debug },
+				{ ...prev, session: afterMove.session },
 				frameTick(),
 			)
 
 			expect(hitTestMock).toHaveBeenCalledWith(prev.doc, createPoint(5, 5))
 			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(1)
+			expectHitTestPerf(res.perf)
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual({ kind: "shape", id: shapeId })
 		})
@@ -262,7 +250,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 		it("idle: clears hover when hitTest returns null", () => {
 			hitTestMock.mockReturnValue(null)
 
-			const prev0 = editorStateFactory({
+			const prev = editorStateFactory({
 				session: {
 					...editorStateFactory().session,
 					mode: { kind: "idle" },
@@ -270,7 +258,6 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 					latestPointer: { kind: "none" },
 				},
 			})
-			const prev = withHitTests(prev0, 3)
 
 			const afterMove = pointerReducer(
 				prev,
@@ -278,27 +265,24 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			)
 
 			const res = pointerReducer(
-				{ ...prev, session: afterMove.session, debug: afterMove.debug },
+				{ ...prev, session: afterMove.session },
 				frameTick(),
 			)
 
 			expect(res.actions).toEqual([])
-			expect(res.debug.metrics.hitTests).toBe(4)
+			expectHitTestPerf(res.perf)
 			expect(res.session.hover).toEqual({ kind: "none" })
 		})
 
 		it("armed drawRect: stays armed until MIN_DRAG exceeded, then enters drawingRect", () => {
 			hitTestMock.mockReturnValue(null)
 
-			const prev0 = withHitTests(
-				editorStateFactory({
-					session: {
-						...editorStateFactory().session,
-						latestPointer: { kind: "none" },
-					},
-				}),
-				0,
-			)
+			const prev0 = editorStateFactory({
+				session: {
+					...editorStateFactory().session,
+					latestPointer: { kind: "none" },
+				},
+			})
 
 			const down = pointerEventFactory({
 				type: "POINTER_DOWN",
@@ -310,27 +294,24 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			// still within threshold (<=3): sample + tick => noop
 			const afterSmallMove = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				{ ...prev0, session: armedRes.session },
 				move(createPointerId("p1"), createPoint(3, 0)),
 			)
 			const resSmallTick = pointerReducer(
-				{
-					...prev0,
-					session: afterSmallMove.session,
-					debug: afterSmallMove.debug,
-				},
+				{ ...prev0, session: afterSmallMove.session },
 				frameTick(),
 			)
 			expect(resSmallTick.session.mode).toEqual(armedRes.session.mode)
 			expect(resSmallTick.actions).toEqual([])
+			expect(resSmallTick.perf).toEqual([])
 
 			// exceeds threshold: sample + tick => drawingRect
 			const afterBigMove = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				{ ...prev0, session: armedRes.session },
 				move(createPointerId("p1"), createPoint(4, 0)),
 			)
 			const resBigTick = pointerReducer(
-				{ ...prev0, session: afterBigMove.session, debug: afterBigMove.debug },
+				{ ...prev0, session: afterBigMove.session },
 				frameTick(),
 			)
 
@@ -348,19 +329,16 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			hitTestMock.mockReturnValue(shapeId)
 
 			const rect: Rect = rectFactory({ x: 10, y: 20, width: 30, height: 40 })
-			const prev0 = withHitTests(
-				editorStateFactory({
-					doc: {
-						...editorStateFactory().doc,
-						shapes: new Map([[shapeId, rect]]),
-					},
-					session: {
-						...editorStateFactory().session,
-						latestPointer: { kind: "none" },
-					},
-				}),
-				0,
-			)
+			const prev0 = editorStateFactory({
+				doc: {
+					...editorStateFactory().doc,
+					shapes: new Map([[shapeId, rect]]),
+				},
+				session: {
+					...editorStateFactory().session,
+					latestPointer: { kind: "none" },
+				},
+			})
 
 			const down = pointerEventFactory({
 				type: "POINTER_DOWN",
@@ -372,27 +350,24 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			// within threshold
 			const afterSmallMove = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				{ ...prev0, session: armedRes.session },
 				move(createPointerId("p1"), createPoint(0, 3)),
 			)
 			const smallTick = pointerReducer(
-				{
-					...prev0,
-					session: afterSmallMove.session,
-					debug: afterSmallMove.debug,
-				},
+				{ ...prev0, session: afterSmallMove.session },
 				frameTick(),
 			)
 			expect(smallTick.session.mode).toEqual(armedRes.session.mode)
 			expect(smallTick.actions).toEqual([])
+			expect(smallTick.perf).toEqual([])
 
 			// exceeds threshold: starts dragging
 			const afterBigMove = pointerReducer(
-				{ ...prev0, session: armedRes.session, debug: armedRes.debug },
+				{ ...prev0, session: armedRes.session },
 				move(createPointerId("p1"), createPoint(0, 4)),
 			)
 			const bigTick = pointerReducer(
-				{ ...prev0, session: afterBigMove.session, debug: afterBigMove.debug },
+				{ ...prev0, session: afterBigMove.session },
 				frameTick(),
 			)
 
@@ -430,12 +405,13 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 				move(createPointerId("p1"), createPoint(15, 5)),
 			)
 			const res = pointerReducer(
-				{ ...prev0, session: afterMove.session, debug: afterMove.debug },
+				{ ...prev0, session: afterMove.session },
 				frameTick(),
 			)
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({
 				...(prev0.session.mode as any),
 				currentPointer: createPoint(15, 5),
@@ -462,12 +438,13 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 				move(createPointerId("p1"), createPoint(9, 9)),
 			)
 			const res = pointerReducer(
-				{ ...prev0, session: afterMove.session, debug: afterMove.debug },
+				{ ...prev0, session: afterMove.session },
 				frameTick(),
 			)
 
 			expect(hitTestMock).not.toHaveBeenCalled()
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({
 				kind: "drawingRect",
 				pointerId: createPointerId("p1"),
@@ -502,6 +479,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 		})
 
@@ -539,6 +517,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 				createPoint(99, 99),
 			)
 			expect(res.actions).toEqual([addAction])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 		})
 
@@ -585,6 +564,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 				{ x: 6, y: -3 },
 			)
 			expect(res.actions).toEqual([updateAction])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.selection).toEqual({ kind: "shape", id: shapeId })
 		})
@@ -621,6 +601,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 		})
 	})
@@ -645,6 +626,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual({ kind: "none" })
 		})
@@ -673,6 +655,7 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 			const res = pointerReducer(prev, event)
 
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 			expect(res.session.mode).toEqual({ kind: "idle" })
 			expect(res.session.hover).toEqual({ kind: "none" })
 		})
@@ -685,8 +668,8 @@ describe("pointerReducer (FRAME_TICK model)", () => {
 
 			const res = pointerReducer(prev, event)
 			expect(res.session).toBe(prev.session)
-			expect(res.debug).toBe(prev.debug)
 			expect(res.actions).toEqual([])
+			expect(res.perf).toEqual([])
 		})
 	})
 })

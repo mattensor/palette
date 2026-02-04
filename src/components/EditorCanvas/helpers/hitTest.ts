@@ -1,6 +1,6 @@
 import type {
 	CanvasPoint,
-	EditorState,
+	DocumentState,
 	Rect,
 	ShapeId,
 } from "@/components/EditorCanvas/types"
@@ -15,29 +15,18 @@ export function pointInRect(rect: Rect, point: CanvasPoint): boolean {
 }
 
 export function hitTestTopmostShape(
-	state: EditorState,
+	doc: DocumentState,
 	point: CanvasPoint,
 ): ShapeId | null {
-	const t0 = performance.now()
-
-	const { shapeOrder, shapes } = state.doc
-	let hit: ShapeId | null = null
+	const { shapeOrder, shapes } = doc
 
 	for (let i = shapeOrder.length - 1; i >= 0; i--) {
 		const id = shapeOrder[i]
 		const shape = shapes.get(id)
-		if (!shape) continue
 
-		if (pointInRect(shape, point)) {
-			hit = id
-			break
-		}
+		if (!shape) continue
+		if (pointInRect(shape, point)) return id
 	}
 
-	const t1 = performance.now()
-	const metrics = state.debug.metrics
-	metrics.hitTestMsLast = t1 - t0
-	metrics.hitTests += 1
-
-	return hit
+	return null
 }

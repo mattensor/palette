@@ -5,34 +5,17 @@ import { docFactory } from "@/factories/docFactory"
 import { rectFactory } from "@/factories/rectFactory"
 import { hitTestTopmostShape, pointInRect } from "../hitTest"
 
-// Minimal state helper for hit testing
-function makeState(doc: ReturnType<typeof docFactory>) {
-	return {
-		doc,
-		debug: {
-			metrics: {
-				hitTestMsLast: null,
-				hitTests: 0,
-			},
-		},
-	} as any // keep minimal; avoid pulling full EditorState factory if you don't have one
-}
-
 describe("pointInRect", () => {
 	const rect = rectFactory({ x: 0, y: 0, width: 50, height: 50 })
 
-	describe("when the point is inside the shape", () => {
-		test("returns true", () => {
-			const point = canvasPointFactory({ x: 25, y: 25 })
-			expect(pointInRect(rect, point)).toBe(true)
-		})
+	test("returns true when point is inside", () => {
+		const point = canvasPointFactory({ x: 25, y: 25 })
+		expect(pointInRect(rect, point)).toBe(true)
 	})
 
-	describe("when the point is outside the shape", () => {
-		test("returns false", () => {
-			const point = canvasPointFactory({ x: 75, y: 75 })
-			expect(pointInRect(rect, point)).toBe(false)
-		})
+	test("returns false when point is outside", () => {
+		const point = canvasPointFactory({ x: 75, y: 75 })
+		expect(pointInRect(rect, point)).toBe(false)
 	})
 })
 
@@ -41,54 +24,46 @@ describe("hitTestTopmostShape", () => {
 	const firstRect = rectFactory({ x: 0, y: 0, width: 30, height: 30 })
 	const secondRect = rectFactory({ x: 15, y: 15, width: 40, height: 40 })
 
-	describe("when multiple shapes overlap the point", () => {
-		const shapes = new Map([
+	test("returns the topmost shape when multiple shapes overlap (uses shapeOrder topmost)", () => {
+		const shapes = new Map<ShapeId, typeof firstRect>([
 			[firstRect.id, firstRect],
 			[secondRect.id, secondRect],
 		])
+
+		// secondRect is topmost because it's later in the order
 		const shapeOrder = [firstRect.id, secondRect.id]
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns the topmost shape and records metrics", () => {
-			const state = makeState(doc)
-
-			expect(hitTestTopmostShape(state, point)).toEqual(secondRect.id)
-
-			expect(state.debug.metrics.hitTests).toBe(1)
-			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
-			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
-		})
+		expect(hitTestTopmostShape(doc, point)).toEqual(secondRect.id)
 	})
 
-	describe("when exactly one shape contains the point", () => {
-		const shapes = new Map([[firstRect.id, firstRect]])
+	test("returns the only shape that contains the point", () => {
+		const shapes = new Map<ShapeId, typeof firstRect>([
+			[firstRect.id, firstRect],
+		])
 		const shapeOrder = [firstRect.id]
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns that shape and records metrics", () => {
-			const state = makeState(doc)
-
-			expect(hitTestTopmostShape(state, point)).toEqual(firstRect.id)
-
-			expect(state.debug.metrics.hitTests).toBe(1)
-			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
-			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
-		})
+		expect(hitTestTopmostShape(doc, point)).toEqual(firstRect.id)
 	})
 
-	describe("when no shapes contain the point", () => {
-		const shapes = new Map()
+	test("returns null when no shapes contain the point", () => {
+		const shapes = new Map<ShapeId, typeof firstRect>()
 		const shapeOrder: ShapeId[] = []
 		const doc = docFactory({ shapes, shapeOrder })
 
-		test("returns null and records metrics", () => {
-			const state = makeState(doc)
+		expect(hitTestTopmostShape(doc, point)).toBeNull()
+	})
 
-			expect(hitTestTopmostShape(state, point)).toBeNull()
+	test("skips missing shapes referenced by shapeOrder", () => {
+		const missingId = "missing" as ShapeId
 
-			expect(state.debug.metrics.hitTests).toBe(1)
-			expect(state.debug.metrics.hitTestMsLast).not.toBeNull()
-			expect(state.debug.metrics.hitTestMsLast).toBeGreaterThanOrEqual(0)
-		})
+		const shapes = new Map<ShapeId, typeof firstRect>([
+			[secondRect.id, secondRect],
+		])
+		const shapeOrder = [missingId, secondRect.id] // topmost is secondRect; missing should be ignored
+		const doc = docFactory({ shapes, shapeOrder })
+
+		expect(hitTestTopmostShape(doc, point)).toEqual(secondRect.id)
 	})
 })

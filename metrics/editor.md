@@ -2,96 +2,104 @@
 
 ## Purpose
 
-Lightweight metrics used to validate early architectural decisions in the editor core.  
-Metrics are sampled per animation frame and are intended for sanity-checking, not benchmarking.
+Lightweight, frame-scoped metrics used to **validate architectural decisions** in the editor core.
+
+These metrics are **diagnostic signals**, not benchmarks.  
+They exist to surface regressions, scaling risks, and incorrect interaction modeling during development—not to drive premature optimization.
+
+Metrics are sampled once per animation frame.
 
 ---
 
-## Input & Rendering
+## Frame Health
 
-### Event batching (`queueLength`, `movesDropped`, `movesKept`)
+### Frame timing (`frameMsLast`, `frameMsAvg`, `lastRenderMs`)
 
-- **Observation:**  
-  Pointer and keyboard input can generate many events between animation frames, and pointer-move events can dominate the queue during interaction.
+**Observation**  
+The editor performs a full canvas redraw per animation frame. Overall responsiveness depends on the combined cost of:
+- event reduction
+- interaction advancement
+- rendering
 
-- **Metrics:**  
-  - `queueLength` — raw number of input events enqueued since the previous frame  
-  - `movesDropped` — number of pointer-move events discarded by coalescing  
-  - `movesKept` — number of pointer-move events retained by coalescing
+**Metrics**
+- `frameMsLast` — total processing time for the most recent frame
+- `frameMsAvg` — exponential moving average of frame processing time
+- `lastRenderMs` — time spent rendering the canvas in the most recent frame
 
-- **Target:**  
-  During active pointer interaction, `queueLength` may grow, while coalescing ensures that the number of events actually reduced per frame remains bounded and rendering stays aligned with the browser frame rate.
+**Target**
+- `frameMsAvg` remains comfortably under the frame budget
+- `lastRenderMs` remains a minority of total frame cost
+- spikes in `frameMsLast` are explainable via interaction state or shape count
 
-- **Result:**  
-  Coalescing reduces unnecessary reducer work and avoids excessive renders while preserving interaction fidelity.
-
----
-
-### Frame and render cost (`frameMsAvg`, `lastRenderMs`, `shapeCount`)
-
-- **Observation:**  
-  The editor performs a full canvas redraw each frame; overall responsiveness depends on the combined cost of event reduction, hit-testing (when applicable), and rendering.
-
-- **Metrics:**  
-  - `frameMsAvg` — exponential moving average of total frame processing time  
-  - `lastRenderMs` — time spent rendering the canvas (single frame)  
-  - `shapeCount` — number of rendered shapes
-
-- **Target:**  
-  `frameMsAvg` remains comfortably under the frame budget at current `shapeCount`, and `lastRenderMs` stays low enough that non-render work does not cause jank.
-
-- **Result:**  
-  Full redraw rendering is acceptable for the current scope, and frame-time smoothing provides a stable signal for regressions.
+**Result**  
+Full redraw rendering is acceptable at current scale. Frame-level aggregation provides a stable, low-noise signal for detecting performance regressions.
 
 ---
 
-## Interaction Modeling
+## Input Pressure
 
-### Mode transitions
+### Event batching (`queueLength`, `movesDropped`)
 
-- **Observation:**  
-  Pointer interactions move through explicit modes (`idle`, `armed`, `dragging`, `drawing`).
+**Observation**  
+Pointer and keyboard input can generate many events between animation frames, with pointer-move events dominating during active interaction.
 
-- **Target:**  
-  No invalid transitions or stuck interaction states.
+**Metrics**
+- `queueLength` — number of raw input events queued since the previous frame
+- `movesDropped` — number of pointer-move events discarded by coalescing
 
-- **Result:**  
-  Interaction behavior is predictable and cancellation behaves correctly.
+**Target**
+- During active pointer interaction:
+  - `queueLength` may grow transiently
+  - `movesDropped` increases as redundant pointer moves are collapsed
+  - reducer and render work remains bounded to one frame’s worth of state advancement
+
+**Result**  
+Input coalescing reduces unnecessary reducer work and prevents excessive renders while preserving interaction fidelity.
 
 ---
 
-### Hit-testing cost (`hitTests`, `hitTestMsLast`, `shapeCount`)
+## Scale Signals
 
-- **Observation:**  
-  Hit-testing is performed on pointer down (intent resolution) and on pointer move while idle (hover).  
-  Drag interactions do not perform hit-testing.
+### Hit-testing and shape count (`shapeCount`, `hitTestsThisFrame`)
 
-- **Metrics:**  
-  - `hitTests` — number of hit-tests performed per frame  
-  - `hitTestMsLast` — time spent in the most recent hit-test  
-  - `shapeCount` — number of shapes rendered (and an upper bound on scan work)
+**Observation**  
+Hit-testing is performed:
+- on pointer down (intent resolution)
+- on pointer move while idle (hover detection)
 
-- **Target:**  
-  Hit-testing remains cheap at current `shapeCount` and does not materially affect `frameMsAvg`.  
-  `hitTestMsLast` should stay low and scale roughly linearly with shape count.
+Hit-testing is **not** performed during active dragging or drawing.
 
-- **Result:**  
-  No hit-testing related performance issues observed; timing visibility helps isolate regressions when hover or selection begins to cost more than expected.
+**Metrics**
+- `shapeCount` — number of shapes in the document (upper bound on scan work)
+- `hitTestsThisFrame` — number of hit-tests performed during the current frame
+
+**Target**
+- `hitTestsThisFrame` remains small and predictable
+- hit-testing frequency correlates with interaction state, not pointer frequency
+- increases in `shapeCount` increase hit-test work linearly and visibly
+
+**Result**  
+Hit-testing cost is bounded by interaction modeling rather than raw input frequency.  
+Per-frame counts provide sufficient visibility without relying on noisy micro-timing.
 
 ---
 
 ## Undo / Redo
 
-### History depth (`historyDepth`)
+### History state (`historyInfo`)
 
-- **Observation:**  
-  Undo / redo correctness depends on the editor committing semantic user actions rather than mechanical state changes.
+**Observation**  
+Undo / redo correctness depends on committing **semantic user actions**, not mechanical state updates.
 
-- **Metric:**  
-  `historyDepth` — number of committed, undoable editor states.
+**Metrics**
+- `historyInfo.depth` — number of committed, undoable document patches
+- `historyInfo.canUndo` — whether an undo operation is currently valid
+- `historyInfo.canRedo` — whether a redo operation is currently valid
 
-- **Target:**  
-  History depth increases only on semantic commits (e.g. completed drags, discrete commands) and never decreases below the root state.
+**Target**
+- History depth increases only on semantic commits (e.g. completed drags, discrete commands)
+- Redo history is invalidated on new commits
+- History never underflows below the root state
 
-- **Result:**  
-  History depth correlates with user intent, redo invalidation behaves correctly, and multi-step interactions are batched into single undoable actions.
+**Result**  
+Undo/redo behavior aligns with user intent, supports branching correctly, and remains stable under complex interaction sequences.

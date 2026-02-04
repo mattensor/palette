@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest"
 
-import { historyReducer } from "@/components/EditorCanvas/reducer/historyReducer"
+import { applyDocAction } from "@/components/EditorCanvas/reducer/applyDocAction"
 import type { ShapeId } from "@/components/EditorCanvas/types/domain"
 import { docActionFactory } from "@/factories/docActionFactory"
 import { docFactory } from "@/factories/docFactory"
 import { docPatchFactory } from "@/factories/docPatchFactory"
 import { editorStateFactory } from "@/factories/editorStateFactory"
-import { historyInfoFactory } from "@/factories/historyInfoFactory"
 import { rectFactory } from "@/factories/rectFactory"
 
-describe("historyReducer", () => {
+describe("applyDocAction", () => {
 	it("COMMIT: applies patch, pushes patch to past, clears future", () => {
 		const id = "shape-1" as ShapeId
 		const rect = rectFactory({ id, x: 1, y: 2, width: 3, height: 4 })
@@ -26,12 +25,10 @@ describe("historyReducer", () => {
 			},
 		})
 
-		const next = historyReducer(prev, docActionFactory.commit(patch))
+		const next = applyDocAction(prev, docActionFactory.commit(patch))
 
 		expect(next.history.past).toEqual([patch])
 		expect(next.history.future).toEqual([])
-
-		expect(next.debug.historyInfo).toEqual(historyInfoFactory(next.history))
 
 		expect(next.doc.shapes.get(id)).toEqual(rect)
 		expect(next.doc.shapeOrder).toEqual([id])
@@ -42,7 +39,7 @@ describe("historyReducer", () => {
 		const rect = rectFactory({ id, x: 0, y: 0, width: 10, height: 10 })
 		const addPatch = docPatchFactory.addRect(rect)
 
-		const applied = historyReducer(
+		const applied = applyDocAction(
 			editorStateFactory({
 				doc: docFactory({
 					shapes: new Map(),
@@ -55,16 +52,10 @@ describe("historyReducer", () => {
 		expect(applied.doc.shapes.has(id)).toBe(true)
 		expect(applied.history.past).toEqual([addPatch])
 
-		expect(applied.debug.historyInfo).toEqual(
-			historyInfoFactory(applied.history),
-		)
-
-		const undone = historyReducer(applied, docActionFactory.undo())
+		const undone = applyDocAction(applied, docActionFactory.undo())
 
 		expect(undone.history.past).toEqual([])
 		expect(undone.history.future).toEqual([addPatch])
-
-		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
 
 		expect(undone.doc.shapes.has(id)).toBe(false)
 		expect(undone.doc.shapeOrder).toEqual([])
@@ -75,7 +66,7 @@ describe("historyReducer", () => {
 		const rect = rectFactory({ id, x: 5, y: 6, width: 7, height: 8 })
 		const addPatch = docPatchFactory.addRect(rect)
 
-		const applied = historyReducer(
+		const applied = applyDocAction(
 			editorStateFactory({
 				doc: docFactory({
 					shapes: new Map(),
@@ -84,19 +75,15 @@ describe("historyReducer", () => {
 			}),
 			docActionFactory.commit(addPatch),
 		)
-		const undone = historyReducer(applied, docActionFactory.undo())
+		const undone = applyDocAction(applied, docActionFactory.undo())
 
 		expect(undone.doc.shapes.has(id)).toBe(false)
 		expect(undone.history.future).toEqual([addPatch])
 
-		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
-
-		const redone = historyReducer(undone, docActionFactory.redo())
+		const redone = applyDocAction(undone, docActionFactory.redo())
 
 		expect(redone.history.past).toEqual([addPatch])
 		expect(redone.history.future).toEqual([])
-
-		expect(redone.debug.historyInfo).toEqual(historyInfoFactory(redone.history))
 
 		expect(redone.doc.shapes.get(id)).toEqual(rect)
 		expect(redone.doc.shapeOrder).toEqual([id])
@@ -116,22 +103,16 @@ describe("historyReducer", () => {
 		})
 
 		const patch = docPatchFactory.updateRect({ id, before, after })
-		const applied = historyReducer(prev, docActionFactory.commit(patch))
+		const applied = applyDocAction(prev, docActionFactory.commit(patch))
 
 		expect(applied.doc.shapes.get(id)).toEqual(after)
 		expect(applied.history.past).toEqual([patch])
 
-		expect(applied.debug.historyInfo).toEqual(
-			historyInfoFactory(applied.history),
-		)
-
-		const undone = historyReducer(applied, docActionFactory.undo())
+		const undone = applyDocAction(applied, docActionFactory.undo())
 
 		expect(undone.doc.shapes.get(id)).toEqual(before)
 		expect(undone.history.past).toEqual([])
 		expect(undone.history.future).toEqual([patch])
-
-		expect(undone.debug.historyInfo).toEqual(historyInfoFactory(undone.history))
 	})
 
 	it("UNDO: noops when there is nothing to undo", () => {
@@ -139,7 +120,7 @@ describe("historyReducer", () => {
 			history: { past: [], future: [] },
 		})
 
-		const next = historyReducer(prev, docActionFactory.undo())
+		const next = applyDocAction(prev, docActionFactory.undo())
 
 		expect(next).toBe(prev)
 	})
@@ -149,7 +130,7 @@ describe("historyReducer", () => {
 			history: { past: [], future: [] },
 		})
 
-		const next = historyReducer(prev, docActionFactory.redo())
+		const next = applyDocAction(prev, docActionFactory.redo())
 		expect(next).toBe(prev)
 	})
 
@@ -162,17 +143,32 @@ describe("historyReducer", () => {
 		const rect2 = rectFactory({ id: id2 })
 		const p2 = docPatchFactory.addRect(rect2)
 
-		const s1 = historyReducer(editorStateFactory(), docActionFactory.commit(p1))
-		const s2 = historyReducer(s1, docActionFactory.undo())
+		const id3 = "shape-3" as ShapeId
+		const rect3 = rectFactory({ id: id3 })
+		const p3 = docPatchFactory.addRect(rect3)
 
-		expect(s2.history.future).toEqual([p1])
+		// commit p1 then p2
+		const s1 = applyDocAction(editorStateFactory(), docActionFactory.commit(p1))
+		const s2 = applyDocAction(s1, docActionFactory.commit(p2))
 
-		expect(s2.debug.historyInfo).toEqual(historyInfoFactory(s2.history))
+		expect(s2.history.past).toEqual([p1, p2])
+		expect(s2.history.future).toEqual([])
 
-		const s3 = historyReducer(s2, docActionFactory.commit(p2))
-		expect(s3.history.future).toEqual([])
-		expect(s3.history.past).toEqual([p2])
+		// undo p2 => past:[p1], future:[p2]
+		const s3 = applyDocAction(s2, docActionFactory.undo())
 
-		expect(s3.debug.historyInfo).toEqual(historyInfoFactory(s3.history))
+		expect(s3.history.past).toEqual([p1])
+		expect(s3.history.future).toEqual([p2])
+
+		// commit p3 => past:[p1,p3], future cleared
+		const s4 = applyDocAction(s3, docActionFactory.commit(p3))
+
+		expect(s4.history.future).toEqual([])
+		expect(s4.history.past).toEqual([p1, p3])
+
+		// doc contains p1 + p3 rects, not p2
+		expect(s4.doc.shapes.get(id1)).toEqual(rect1)
+		expect(s4.doc.shapes.get(id2)).toBeUndefined()
+		expect(s4.doc.shapes.get(id3)).toEqual(rect3)
 	})
 })

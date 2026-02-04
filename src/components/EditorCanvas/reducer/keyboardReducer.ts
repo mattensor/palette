@@ -1,42 +1,36 @@
 import { createRemoveRect } from "@/components/EditorCanvas/reducer/actions/createRemoveRect"
 import type {
-	DebugState,
-	DocAction,
 	EditorState,
 	KeyboardEditorEvent,
-	SessionState,
 } from "@/components/EditorCanvas/types"
+import type { DocAction } from "@/components/EditorCanvas/types/actions"
+import type { SessionState } from "@/components/EditorCanvas/types/interaction"
+import type { InteractionResult } from "./types"
 
-export type KeyboardResult = {
-	session: SessionState
-	debug: DebugState
-	actions: DocAction[]
-}
-
-function noop(prev: EditorState): KeyboardResult {
-	return { session: prev.session, debug: prev.debug, actions: [] }
+function noop(prev: EditorState): InteractionResult {
+	return { session: prev.session, actions: [], perf: [] }
 }
 
 function withClearedSelection(prev: EditorState): SessionState {
 	return { ...prev.session, selection: { kind: "none" } }
 }
 
-function deleteSelection(prev: EditorState): KeyboardResult {
+function deleteSelection(prev: EditorState): InteractionResult {
 	if (prev.session.selection.kind === "none") return noop(prev)
 
 	const action = createRemoveRect(prev.doc, prev.session.selection.id)
 
 	return {
 		session: withClearedSelection(prev),
-		debug: prev.debug,
 		actions: action ? [action] : [],
+		perf: [],
 	}
 }
 
 export function keyboardReducer(
 	prev: EditorState,
 	event: KeyboardEditorEvent,
-): KeyboardResult {
+): InteractionResult {
 	switch (event.type) {
 		case "KEY_DOWN":
 			break
@@ -48,13 +42,16 @@ export function keyboardReducer(
 		case "Backspace":
 		case "Delete":
 			return deleteSelection(prev)
+
 		case "z": {
-			const actionType = event.modifiers.shift ? "REDO" : "UNDO"
+			const actionType: DocAction["type"] = event.modifiers.shift
+				? "REDO"
+				: "UNDO"
 
 			return {
 				session: withClearedSelection(prev),
-				debug: prev.debug,
 				actions: [{ type: actionType }],
+				perf: [],
 			}
 		}
 

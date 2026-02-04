@@ -1,9 +1,7 @@
-import { docReducer } from "@/components/EditorCanvas/reducer/docReducer"
-import type {
-	DocAction,
-	DocPatch,
-	EditorState,
-} from "@/components/EditorCanvas/types"
+import type { EditorState } from "@/components/EditorCanvas/types"
+import type { DocAction, DocPatch } from "../types/actions"
+
+import { docReducer } from "./docReducer"
 
 function inversePatch(patch: DocPatch): DocPatch {
 	switch (patch.type) {
@@ -23,17 +21,6 @@ function inversePatch(patch: DocPatch): DocPatch {
 	}
 }
 
-function getHistoryInfo(history: EditorState["history"]) {
-	const pastLength = history.past.length
-	const futureLength = history.future.length
-
-	return {
-		depth: pastLength,
-		canUndo: pastLength > 0,
-		canRedo: futureLength > 0,
-	}
-}
-
 function undo(prev: EditorState): EditorState {
 	const patch = prev.history.past.at(-1)
 	if (!patch) return prev
@@ -49,10 +36,6 @@ function undo(prev: EditorState): EditorState {
 		...prev,
 		doc: docReducer(prev.doc, inverse),
 		history,
-		debug: {
-			...prev.debug,
-			historyInfo: getHistoryInfo(history),
-		},
 	}
 }
 
@@ -69,34 +52,25 @@ function redo(prev: EditorState): EditorState {
 		...prev,
 		doc: docReducer(prev.doc, patch),
 		history,
-		debug: {
-			...prev.debug,
-			historyInfo: getHistoryInfo(history),
-		},
 	}
 }
 
-export function historyReducer(
+export function applyDocAction(
 	prev: EditorState,
 	action: DocAction,
 ): EditorState {
 	switch (action.type) {
 		case "COMMIT": {
 			const patch = action.patch
-
 			const history = {
 				past: [...prev.history.past, patch],
-				future: [], // invalidate future history
+				future: [],
 			}
 
 			return {
 				...prev,
 				doc: docReducer(prev.doc, patch),
 				history,
-				debug: {
-					...prev.debug,
-					historyInfo: getHistoryInfo(history),
-				},
 			}
 		}
 

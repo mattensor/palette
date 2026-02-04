@@ -1,4 +1,8 @@
-import type { DebugState, Mode } from "@/components/EditorCanvas/types"
+import type {
+	DebugState,
+	DevLogEvent,
+} from "@/components/EditorCanvas/types/debug"
+import type { Mode } from "@/components/EditorCanvas/types/interaction"
 import styles from "./styles.module.css"
 
 export type DebugSnapshot = {
@@ -14,12 +18,6 @@ function formatMs(ms: number | null) {
 
 function getLastN<T>(items: readonly T[], n: number): readonly T[] {
 	return items.slice(Math.max(0, items.length - n))
-}
-
-type DevLogEntry = {
-	ts: number
-	name: string
-	data?: unknown
 }
 
 type LogRow = {
@@ -39,7 +37,7 @@ function safeStringify(value: unknown): string | null {
 	}
 }
 
-function toLogRows(devLog: readonly DevLogEntry[]): LogRow[] {
+function toLogRows(devLog: readonly DevLogEvent[]): LogRow[] {
 	return devLog.map((e, idx) => {
 		const prev = idx > 0 ? devLog[idx - 1] : null
 		const delta = prev ? e.ts - prev.ts : null
@@ -58,7 +56,7 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 	const { mode, debug } = snapshot
 	const { metrics, devLog, historyInfo } = debug
 
-	const recent = getLastN(devLog as readonly DevLogEntry[], LOGS_TO_SHOW)
+	const recent = getLastN(devLog, LOGS_TO_SHOW)
 	const recentLogRows = toLogRows(recent).reverse()
 
 	return (
@@ -75,6 +73,9 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 				<div>lastRenderMs</div>
 				<div>{formatMs(metrics.lastRenderMs)}</div>
 
+				<div>frameMsLast</div>
+				<div>{formatMs(metrics.frameMsLast)}</div>
+
 				<div>frameMsAvg</div>
 				<div>{formatMs(metrics.frameMsAvg)}</div>
 
@@ -84,14 +85,8 @@ export function DevPanel({ snapshot }: { snapshot: DebugSnapshot }) {
 				<div>movesDropped</div>
 				<div>{metrics.movesDropped}</div>
 
-				<div>movesKept</div>
-				<div>{metrics.movesKept}</div>
-
-				<div>hitTests</div>
-				<div>{metrics.hitTests}</div>
-
-				<div>hitTestMsLast</div>
-				<div>{formatMs(metrics.hitTestMsLast)}</div>
+				<div>hitTestsThisFrame</div>
+				<div>{metrics.hitTestsThisFrame}</div>
 			</div>
 
 			<div className={styles.sectionTitle}>history</div>
