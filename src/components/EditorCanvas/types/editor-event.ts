@@ -3,6 +3,11 @@ import type {
 	PointerId,
 } from "@/components/EditorCanvas/types/domain"
 
+export type SpawnShapesEvent = {
+	type: "SPAWN_SHAPES"
+	count: number
+}
+
 export type Key = "Delete" | "Backspace" | "Escape" | "z"
 
 export type Modifiers = {
@@ -41,5 +46,6 @@ export type EditorEvent =
 	| PointerEditorEvent
 	| KeyboardEditorEvent
 	| FrameTickEvent
+	| SpawnShapesEvent
 
 export type EditorEventType = EditorEvent["type"]

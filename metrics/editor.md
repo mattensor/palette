@@ -103,3 +103,15 @@ Undo / redo correctness depends on committing **semantic user actions**, not mec
 
 **Result**  
 Undo/redo behavior aligns with user intent, supports branching correctly, and remains stable under complex interaction sequences.
+
+## Notes on Excluded Metrics
+
+Certain metrics were intentionally **not included**:
+
+- Per-hit timing (e.g. micro-timing individual hit-tests)  
+  → too noisy, too small to be actionable, and encourages premature optimization
+
+- Per-event reducer timing  
+  → frame-level aggregation provides clearer architectural signals
+
+If finer-grained timing is needed in the future, it can be introduced as **opt-in diagnostics** rather than always-on metrics.

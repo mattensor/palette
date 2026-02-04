@@ -15,6 +15,8 @@ export type DocPatch =
 			before: Rect
 			after: Rect
 	  }
+	| { type: "ADD_RECTS"; after: Rect[] }
+	| { type: "REMOVE_RECTS"; before: Rect[] }
 
 export type DocAction =
 	| { type: "COMMIT"; patch: DocPatch }

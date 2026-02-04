@@ -7,6 +7,7 @@ import { normaliseKeyboardEvent } from "@/components/EditorCanvas/helpers/normal
 import { editorReducer } from "@/components/EditorCanvas/reducer"
 import { createInitialState } from "@/components/EditorCanvas/reducer/createInitialState"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
+import { Toolbar, ToolbarButton } from "@/components/Toolbar"
 import { createDebugRecorder } from "./debug/createDebugRecorder"
 import { normalisePointerEvent } from "./helpers/normalisePointerEvent"
 import { render } from "./render"
@@ -169,8 +170,19 @@ export function EditorCanvas() {
 		if (editorEvent) enqueueEvent(editorEvent)
 	}
 
+	function spawn(count: number) {
+		enqueueEvent({ type: "SPAWN_SHAPES", count })
+		canvasRef.current?.focus()
+	}
+
 	return (
 		<div ref={hostRef} className={styles.canvasHost}>
+			<Toolbar>
+				<ToolbarButton onClick={() => spawn(1000)} title="Spawn 1000 shapes">
+					Spawn 1000
+				</ToolbarButton>
+			</Toolbar>
+
 			<CanvasArea
 				tabIndex={0}
 				ref={canvasRef}

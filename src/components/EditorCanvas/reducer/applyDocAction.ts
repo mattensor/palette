@@ -16,8 +16,14 @@ function inversePatch(patch: DocPatch): DocPatch {
 				before: patch.after,
 				after: patch.before,
 			}
+		case "ADD_RECTS":
+			return { type: "REMOVE_RECTS", before: patch.after }
+
+		case "REMOVE_RECTS":
+			return { type: "ADD_RECTS", after: patch.before }
+
 		default:
-			throw new Error(`DocPatch not supported type:${patch}`)
+			throw new Error(`DocPatch not supported: ${JSON.stringify(patch)}`)
 	}
 }
 

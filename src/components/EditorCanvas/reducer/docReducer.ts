@@ -47,6 +47,33 @@ export function docReducer(
 			}
 		}
 
+		case "ADD_RECTS": {
+			const shapes = new Map(prev.shapes)
+
+			for (const rect of patch.after) {
+				shapes.set(rect.id, rect)
+			}
+
+			return {
+				...prev,
+				shapes,
+				shapeOrder: [...prev.shapeOrder, ...patch.after.map((r) => r.id)],
+			}
+		}
+
+		case "REMOVE_RECTS": {
+			const shapes = new Map(prev.shapes)
+			const idsToRemove = new Set(patch.before.map((r) => r.id))
+
+			for (const rect of patch.before) shapes.delete(rect.id)
+
+			return {
+				...prev,
+				shapes,
+				shapeOrder: prev.shapeOrder.filter((id) => !idsToRemove.has(id)),
+			}
+		}
+
 		default:
 			return prev
 	}

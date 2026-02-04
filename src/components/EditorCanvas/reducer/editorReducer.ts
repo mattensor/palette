@@ -1,3 +1,5 @@
+import { commandReducer } from "@/components/EditorCanvas/reducer/commandReducer"
+import type { InteractionResult } from "@/components/EditorCanvas/reducer/types"
 import type {
 	DocAction,
 	EditorEvent,
@@ -18,10 +20,29 @@ export function editorReducer(
 	prev: EditorState,
 	event: EditorEvent,
 ): CoreReduceResult {
-	const interaction =
-		event.type === "KEY_DOWN"
-			? keyboardReducer(prev, event)
-			: pointerReducer(prev, event)
+	let interaction: InteractionResult
+	switch (event.type) {
+		case "KEY_DOWN":
+			interaction = keyboardReducer(prev, event)
+			break
+
+		case "POINTER_DOWN":
+		case "POINTER_MOVE":
+		case "POINTER_UP":
+		case "POINTER_CANCEL":
+		case "FRAME_TICK":
+			interaction = pointerReducer(prev, event)
+			break
+
+		case "SPAWN_SHAPES":
+			interaction = commandReducer(prev, event)
+			break
+
+		default: {
+			const _exhaustive: never = event
+			throw new Error(`Unhandled event: ${JSON.stringify(_exhaustive)}`)
+		}
+	}
 
 	let next: EditorState = {
 		...prev,
