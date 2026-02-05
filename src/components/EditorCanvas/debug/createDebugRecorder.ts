@@ -1,11 +1,11 @@
-import type { EditorState } from "@/components/EditorCanvas/types/core"
-import type { DocAction, DocPatch } from "../types/actions"
 import type {
 	DebugState,
 	DevLogEvent,
+	EditorState,
 	HistoryInfo,
 	Metrics,
-} from "../types/debug"
+} from "@/components/EditorCanvas/types"
+import type { DocAction, DocPatch } from "../types/actions"
 import type { PerfEvent } from "../types/perf"
 
 const DEVLOG_MAX = 200
@@ -67,7 +67,7 @@ function patchSummary(patch: DocPatch) {
 				after: patch.after,
 			}
 		default:
-			return patch satisfies never
+			return patch as unknown as never
 	}
 }
 

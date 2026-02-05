@@ -5,7 +5,7 @@ type Brand<K, T extends string> = K & { readonly __brand: T }
 export type PointerId = Brand<number, "PointerId">
 export type ShapeId = Brand<string, "ShapeId">
 
-export type Rect = {
+export interface Rect {
 	readonly id: ShapeId
 	readonly x: number
 	readonly y: number
