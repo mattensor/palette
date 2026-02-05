@@ -1,11 +1,18 @@
-import type { EditorState } from "@/components/EditorCanvas/types"
+import type {
+	DocumentState,
+	EditorState,
+} from "@/components/EditorCanvas/types"
+
+export function createEmptyDocument(): DocumentState {
+	return {
+		shapes: new Map(),
+		shapeOrder: [],
+	}
+}
 
 export function createInitialState(): EditorState {
 	return {
-		doc: {
-			shapes: new Map(),
-			shapeOrder: [],
-		},
+		doc: createEmptyDocument(),
 		history: {
 			past: [],
 			future: [],
