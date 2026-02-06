@@ -4,6 +4,8 @@ import { CanvasArea } from "@/components/CanvasArea"
 import { type DebugSnapshot, DevPanel } from "@/components/DevPanel"
 import { coalesceMoveEvents } from "@/components/EditorCanvas/helpers/coalesceMoveEvents"
 import { normaliseKeyboardEvent } from "@/components/EditorCanvas/helpers/normaliseKeyboardEvent"
+import { loadDocument } from "@/components/EditorCanvas/persistence/loadDocument"
+import { saveDocument } from "@/components/EditorCanvas/persistence/saveDocument"
 import { editorReducer } from "@/components/EditorCanvas/reducer"
 import { createInitialState } from "@/components/EditorCanvas/reducer/createInitialState"
 import type { EditorEvent } from "@/components/EditorCanvas/types"
@@ -14,14 +16,26 @@ import { render } from "./render"
 import styles from "./styles.module.css"
 
 export function EditorCanvas() {
+	const [initialCore] = useState(() => {
+		const loaded = loadDocument() // does not throw
+		const initial = createInitialState()
+		return {
+			...initial,
+			doc: loaded.doc,
+		}
+	})
+
 	const hostRef = useRef<HTMLDivElement>(null)
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
 	const eventQueueRef = useRef<EditorEvent[]>([])
 	const frameScheduledRef = useRef(false)
 
-	const coreRef = useRef(createInitialState())
+	const coreRef = useRef(initialCore)
 	const debugRecorderRef = useRef(createDebugRecorder())
+
+	const needsSaveRef = useRef(false)
+	const saveScheduledRef = useRef(false)
 
 	const [debugSnapshot, setDebugSnapshot] = useState<DebugSnapshot>(() => ({
 		mode: coreRef.current.session.mode,
@@ -67,6 +81,22 @@ export function EditorCanvas() {
 		return () => resizeObserver.disconnect()
 	}, [])
 
+	function scheduleSave() {
+		if (saveScheduledRef.current) return
+		saveScheduledRef.current = true
+
+		setTimeout(() => {
+			try {
+				if (needsSaveRef.current) {
+					needsSaveRef.current = false
+					saveDocument(coreRef.current.doc)
+				}
+			} finally {
+				saveScheduledRef.current = false
+			}
+		}, 0)
+	}
+
 	function processFrame() {
 		const frameStart = performance.now()
 		const recorder = debugRecorderRef.current
@@ -85,27 +115,36 @@ export function EditorCanvas() {
 			queueLength,
 		})
 
-		// process input events
+		let docChangedThisFrame = false
+
 		for (const event of events) {
 			const prev = coreRef.current
 			const { next, actions, perf } = editorReducer(prev, event)
 			coreRef.current = next
 
+			if (prev.doc !== next.doc) docChangedThisFrame = true
+
 			recorder.recordPerf(perf)
 			recorder.recordTransition({ prev, next, actions })
 		}
 
-		// always do a frame tick
+		{
+			const prev = coreRef.current
+			const { next, actions, perf } = editorReducer(prev, {
+				type: "FRAME_TICK",
+				now: performance.now(),
+			})
+			coreRef.current = next
 
-		const prev = coreRef.current
-		const { next, actions, perf } = editorReducer(prev, {
-			type: "FRAME_TICK",
-			now: performance.now(),
-		})
-		coreRef.current = next
+			if (prev.doc !== next.doc) docChangedThisFrame = true
 
-		recorder.recordPerf(perf)
-		recorder.recordTransition({ prev, next, actions })
+			recorder.recordPerf(perf)
+			recorder.recordTransition({ prev, next, actions })
+		}
+
+		if (docChangedThisFrame) needsSaveRef.current = true
+
+		scheduleSave()
 
 		const canvas = canvasRef.current
 		if (canvas == null) return

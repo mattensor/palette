@@ -7,7 +7,7 @@ import { fromPersisted } from "@/components/EditorCanvas/persistence/serialise"
 import { createEmptyDocument } from "@/components/EditorCanvas/reducer/createInitialState"
 import type { DocumentState } from "@/components/EditorCanvas/types"
 
-export function load(): {
+export function loadDocument(): {
 	doc: DocumentState
 	recovered: boolean
 } {
