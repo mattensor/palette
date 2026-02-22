@@ -1,78 +1,93 @@
 # Palette
 
-Palette is a canvas-based editor I’m building to practice **frontend system design**, not UI polish.
+Palette is a canvas-based editor inspired by tools like Canva and Figma.
 
-The focus of this project is on:
+I’m building it to explore the architecture and performance challenges behind interaction-heavy web applications. The focus is on how an editor behaves under real constraints like continuous pointer input, evolving document state, undo/redo history, and smooth rendering.
 
-- input handling
-- state modeling
-- rendering boundaries
-- performance constraints
-
-I’m deliberately treating this like an internal editor system rather than a demo app.
+This is about building a system that behaves like a real editor, not a visual demo.
 
 ---
 
-## What this project is (and isn’t)
+## Why
 
-This project is about **how an editor works**, not how it looks.
+Modern design tools need to handle complex interactions while keeping state predictable and performance smooth.
 
-I’m using it to explore:
+This project explores how to structure a browser-based editor for:
 
-- pointer input normalization (browser → domain events)
-- deterministic state updates (event → reducer → next state)
-- frame-aware rendering via requestAnimationFrame
-- clear separation between runtime interaction state and document state
+- predictable state updates under high-frequency input
+- clear separation between interaction state and document state
+- frame-aware rendering using `requestAnimationFrame`
+- local-first persistence and recovery
+- an architecture that is independent of any UI framework
 
-It is **not**:
-
-- a finished product
-- a UI-heavy design exercise
-- a collection of React patterns
+The goal is to understand the tradeoffs behind real editor systems and build something that holds up under pressure.
 
 ---
 
-## Architecture overview
+## Focus areas
 
-The editor is split into a few layers:
-
-[ App / Layout ]
-AppShell, Editor
-
-[ Host / Adapter ]
-CanvasHost (event normalization + rAF scheduling)
-
-[ Editor Core (headless) ]
-EditorState, Reducer, Effects, DocReducer, Renderer
-
-
-Key ideas:
-
-- The editor core does not depend on React or the DOM
-- CanvasHost adapts browser input + scheduling to the editor
-- Rendering is a pure read of editor state
-- Document changes are applied via explicit DocEffects
+- Pointer input normalization (browser to domain events)
+- Deterministic state transitions (event → reducer → state)
+- Rendering boundaries and frame control
+- Separating editor core from UI framework
+- Explicit document mutations via effects
+- Performance during continuous interaction
 
 ---
 
-## Current scope
+## Architecture
 
-Right now, the editor supports:
+The editor is split into three layers.
 
-- normalized pointer + keyboard events (`EditorEvent`)
-- event batching and rendering via `requestAnimationFrame`
-- shape drawing (rectangle preview while drawing, commit on pointer up)
-- hit-testing + hover state
-- selection (single shape)
-- dragging selected shapes (anchored drag model)
-- deleting the selected shape via keyboard
+**App / Layout**  
+React components and application shell.
 
-In progress / next:
+**Host / Adapter**  
+`CanvasHost` converts browser input into domain events and schedules rendering using `requestAnimationFrame`.
 
-- undo / redo (patch-based history)
-- coalescing drag into a single committed history entry
-- persistence
-- performance profiling + batching refinements
+**Editor Core (headless)**  
+State, reducers, effects, and rendering logic that do not depend on React or the DOM.
+
+### Principles
+
+- The editor core is framework-independent  
+- Browser input becomes domain-level events  
+- Rendering is a pure read of editor state  
+- Interaction state and document state are separate  
+- Document changes happen through explicit effects  
+
+---
+
+## Current capabilities
+
+### Interaction
+- Rectangle drawing with preview and commit
+- Hit testing and hover state
+- Single selection
+- Anchored drag model for moving shapes
+- Drag coalesced into a single history entry
+
+### State and history
+- Reducer-based deterministic state updates
+- Undo / redo using patch-based history
+
+### Persistence
+- Local-first persistence with automatic recovery
+
+### Performance
+- Normalized pointer and keyboard events
+- Event batching with `requestAnimationFrame`
+- Controlled rendering boundaries to avoid unnecessary React work
+- Basic performance profiling and batching improvements
+
+---
+
+## Future exploration
+
+- Multi-selection and grouping
+- Handling large documents (1000+ elements)
+- Canvas vs hybrid rendering strategies
+- Real-time collaboration experiments
 
 ---
 
@@ -83,9 +98,7 @@ In progress / next:
 - Vite
 - Canvas 2D
 
-No state libraries.
-No rendering frameworks.
-No styling systems.
+No external state libraries.
 
 ---
 
@@ -94,13 +107,3 @@ No styling systems.
 ```bash
 npm install
 npm run dev
-```
-
-## Status
-
-Actively in progress and intentionally incomplete.
-
-Each phase focuses on one concern at a time:
-- correctness first
-- structure second
-- polish last
